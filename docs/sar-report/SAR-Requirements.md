@@ -1,6 +1,8 @@
 # Suspicious Activity Report (SAR) Requirements
 ## Accountancy Sector Template Guide
 
+Guidence from https://www.ifa.org.uk/media/783699/Accountancy-Sector-SAR-Template-Dec-2017-2-.pdf
+
 This document outlines the complete requirements for creating and publishing a Suspicious Activity Report (SAR) for the accountancy sector, based on the UK template.
 
 ---
