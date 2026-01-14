@@ -102,6 +102,8 @@ func main() {
 	// Start the server - this blocks until shutdown for both stdio and HTTP modes
 	if err := mcpServer.Start(); err != nil {
 		slog.Error("Server error", "error", err)
-		return
+		// Write to stderr for MCP protocol compliance (allows Claude Desktop to see the error)
+		fmt.Fprintf(os.Stderr, "Fatal error starting MCP server: %v\n", err)
+		os.Exit(1)
 	}
 }

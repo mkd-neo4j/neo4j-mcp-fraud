@@ -37,6 +37,10 @@ bin/
 # Added by goreleaser init:
 dist/
 
+# Root-level binaries (should only be in bin/)
+/neo4j-mcp
+/neo4j-fraud-mcp
+
 # Agents
 CLAUDE.md
 gemini.md

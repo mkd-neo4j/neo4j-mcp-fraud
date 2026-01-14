@@ -131,12 +131,12 @@ func (s *Neo4jMCPServer) getAllToolsDefs(deps *tools.ToolDependencies) []ToolDef
 			},
 			readonly: true,
 		},
-		// Schema Enrichment Category/Section
+		// Schema Tools Category/Section
 		{
 			category: schemaCategory,
 			definition: server.ServerTool{
-				Tool:    schema.EnrichSchemaSpec(),
-				Handler: schema.EnrichSchemaHandler(deps, s.config.SchemaSampleSize),
+				Tool:    schema.GetReferenceModelsSpec(),
+				Handler: schema.GetReferenceModelsHandler(deps),
 			},
 			readonly: true,
 		},

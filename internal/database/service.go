@@ -78,6 +78,11 @@ func (s *Neo4jService) VerifyConnectivity(ctx context.Context) error {
 	return nil
 }
 
+// GetDatabaseName returns the name of the configured database
+func (s *Neo4jService) GetDatabaseName() string {
+	return s.database
+}
+
 // ExecuteReadQuery executes a read-only Cypher query and returns raw records
 func (s *Neo4jService) ExecuteReadQuery(ctx context.Context, cypher string, params map[string]any) ([]*neo4j.Record, error) {
 	queryOptions := s.buildQueryOptions(ctx, neo4j.ExecuteQueryWithReadersRouting())

@@ -114,3 +114,17 @@ func (mr *MockServiceMockRecorder) VerifyConnectivity(ctx any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "VerifyConnectivity", reflect.TypeOf((*MockService)(nil).VerifyConnectivity), ctx)
 }
+
+// GetDatabaseName mocks base method.
+func (m *MockService) GetDatabaseName() string {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "GetDatabaseName")
+	ret0, _ := ret[0].(string)
+	return ret0
+}
+
+// GetDatabaseName indicates an expected call of GetDatabaseName.
+func (mr *MockServiceMockRecorder) GetDatabaseName() *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetDatabaseName", reflect.TypeOf((*MockService)(nil).GetDatabaseName))
+}

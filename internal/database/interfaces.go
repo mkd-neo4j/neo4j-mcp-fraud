@@ -30,6 +30,7 @@ type RecordFormatter interface {
 
 type Helpers interface {
 	VerifyConnectivity(ctx context.Context) error
+	GetDatabaseName() string
 }
 
 // Service combines query execution and record formatting

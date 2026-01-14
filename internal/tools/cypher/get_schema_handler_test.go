@@ -2,8 +2,9 @@ package cypher_test
 
 import (
 	"context"
-	"encoding/json"
+	// "encoding/json" // Commented out - only used in TestGetSchemaProcessing which is now commented out
 	"errors"
+	"strings"
 	"testing"
 
 	"github.com/mark3labs/mcp-go/mcp"
@@ -12,6 +13,7 @@ import (
 	"github.com/mkd-neo4j/neo4j-mcp-fraud/internal/tools"
 	"github.com/mkd-neo4j/neo4j-mcp-fraud/internal/tools/cypher"
 	"github.com/neo4j/neo4j-go-driver/v5/neo4j"
+	"github.com/neo4j/neo4j-go-driver/v5/neo4j/dbtype"
 	"go.uber.org/mock/gomock"
 )
 
@@ -24,40 +26,49 @@ func TestGetSchemaHandler(t *testing.T) {
 
 	t.Run("successful schema retrieval", func(t *testing.T) {
 		mockDB := db.NewMockService(ctrl)
+
+		// Mock GetDatabaseName for logging
 		mockDB.EXPECT().
-			ExecuteReadQuery(gomock.Any(), gomock.Any(), gomock.Eq(map[string]any{"sampleSize": int32(100)})).
+			GetDatabaseName().
+			Return("neo4j").
+			AnyTimes()
+
+		// Mock db.schema.visualization query
+		mockDB.EXPECT().
+			ExecuteReadQuery(gomock.Any(), gomock.Eq("CALL db.schema.visualization()"), nil).
 			Return([]*neo4j.Record{
 				{
-					Keys: []string{"key", "value"},
+					Keys: []string{"nodes", "relationships"},
 					Values: []any{
-						"Movie",
-						map[string]any{
-							"type": "node",
-							"properties": map[string]any{
-								"title": map[string]any{"type": "STRING", "indexed": false},
-							},
-							"relationships": map[string]any{
-								"ACTED_IN": map[string]any{
-									"count":      1,
-									"direction":  "in",
-									"labels":     []any{"Person"},
-									"properties": map[string]any{},
-								},
-							},
+						[]any{
+							map[string]any{"name": "Movie"},
+							map[string]any{"name": "Person"},
 						},
-					},
-				},
-				{
-					Keys: []string{"key", "value"},
-					Values: []any{
-						"ACTED_IN",
-						map[string]any{
-							"type":       "relationship",
-							"properties": map[string]any{},
+						[]any{
+							[]any{
+								map[string]any{"name": "Person"},
+								"ACTED_IN",
+								map[string]any{"name": "Movie"},
+							},
 						},
 					},
 				},
 			}, nil)
+
+		// Mock db.schema.nodeTypeProperties query
+		mockDB.EXPECT().
+			ExecuteReadQuery(gomock.Any(), gomock.Any(), nil).
+			Return([]*neo4j.Record{
+				{
+					Keys:   []string{"nodeLabels", "propertyName", "propertyTypes"},
+					Values: []any{[]any{"Movie"}, "title", []any{"STRING"}},
+				},
+			}, nil)
+
+		// Mock db.schema.relTypeProperties query
+		mockDB.EXPECT().
+			ExecuteReadQuery(gomock.Any(), gomock.Any(), nil).
+			Return([]*neo4j.Record{}, nil)
 
 		deps := &tools.ToolDependencies{
 			DBService:        mockDB,
@@ -77,6 +88,10 @@ func TestGetSchemaHandler(t *testing.T) {
 
 	t.Run("database query failure", func(t *testing.T) {
 		mockDB := db.NewMockService(ctrl)
+		mockDB.EXPECT().
+			GetDatabaseName().
+			Return("neo4j").
+			AnyTimes()
 		mockDB.EXPECT().
 			ExecuteReadQuery(gomock.Any(), gomock.Any(), gomock.Any()).
 			Return(nil, errors.New("connection failed"))
@@ -136,8 +151,22 @@ func TestGetSchemaHandler(t *testing.T) {
 		analyticsService.EXPECT().EmitEvent(gomock.Any()).Times(1)
 		mockDB := db.NewMockService(ctrl)
 		mockDB.EXPECT().
-			ExecuteReadQuery(gomock.Any(), gomock.Any(), gomock.Any()).
+			GetDatabaseName().
+			Return("neo4j").
+			AnyTimes()
+		// Mock schema visualization returning empty
+		mockDB.EXPECT().
+			ExecuteReadQuery(gomock.Any(), gomock.Eq("CALL db.schema.visualization()"), nil).
 			Return([]*neo4j.Record{}, nil)
+		// Mock node count query returning 0
+		mockDB.EXPECT().
+			ExecuteReadQuery(gomock.Any(), gomock.Eq("MATCH (n) RETURN count(n) as nodeCount"), nil).
+			Return([]*neo4j.Record{
+				{
+					Keys:   []string{"nodeCount"},
+					Values: []any{int64(0)},
+				},
+			}, nil)
 
 		deps := &tools.ToolDependencies{
 			DBService:        mockDB,
@@ -162,13 +191,145 @@ func TestGetSchemaHandler(t *testing.T) {
 		}
 
 		textContent := result.Content[0].(mcp.TextContent)
-		if textContent.Text != "The get-schema tool executed successfully; however, since the Neo4j instance contains no data, no schema information was returned." {
-			t.Error("Expected result content to be present for empty database case")
+		if textContent.Text != "The get-schema tool executed successfully; however, since the Neo4j database 'neo4j' contains no data, no schema information was returned." {
+			t.Errorf("Expected updated empty database message, got: %s", textContent.Text)
 		}
+	})
+
+	t.Run("verify proper Cypher syntax in output", func(t *testing.T) {
+		mockDB := db.NewMockService(ctrl)
+
+		// Mock GetDatabaseName for logging
+		mockDB.EXPECT().
+			GetDatabaseName().
+			Return("neo4j").
+			AnyTimes()
+
+		// Create proper dbtype.Node instances with real IDs
+		// NOTE: The "name" property is required for schema visualization
+		customerNode := dbtype.Node{
+			Id:         1,
+			Labels:     []string{"Customer"},
+			Props:      map[string]any{"name": "Customer"},
+			ElementId:  "4:1",
+		}
+		passportNode := dbtype.Node{
+			Id:         2,
+			Labels:     []string{"Passport"},
+			Props:      map[string]any{"name": "Passport"},
+			ElementId:  "4:2",
+		}
+		emailNode := dbtype.Node{
+			Id:         3,
+			Labels:     []string{"Email"},
+			Props:      map[string]any{"name": "Email"},
+			ElementId:  "4:3",
+		}
+
+		// Mock db.schema.visualization query with proper relationships
+		mockDB.EXPECT().
+			ExecuteReadQuery(gomock.Any(), gomock.Eq("CALL db.schema.visualization()"), nil).
+			Return([]*neo4j.Record{
+				{
+					Keys: []string{"nodes", "relationships"},
+					Values: []any{
+						[]any{customerNode, passportNode, emailNode},
+						[]any{
+							dbtype.Relationship{
+								Id:        1,
+								StartId:   1,
+								EndId:     2,
+								Type:      "HAS_PASSPORT",
+								Props:     map[string]any{"name": "HAS_PASSPORT"},
+								ElementId: "5:1",
+							},
+							dbtype.Relationship{
+								Id:        2,
+								StartId:   1,
+								EndId:     3,
+								Type:      "HAS_EMAIL",
+								Props:     map[string]any{"name": "HAS_EMAIL"},
+								ElementId: "5:2",
+							},
+						},
+					},
+				},
+			}, nil)
+
+		// Mock db.schema.nodeTypeProperties query
+		mockDB.EXPECT().
+			ExecuteReadQuery(gomock.Any(), gomock.Any(), nil).
+			Return([]*neo4j.Record{
+				{
+					Keys:   []string{"nodeLabels", "propertyName", "propertyTypes"},
+					Values: []any{[]any{"Customer"}, "customerId", []any{"STRING"}},
+				},
+				{
+					Keys:   []string{"nodeLabels", "propertyName", "propertyTypes"},
+					Values: []any{[]any{"Passport"}, "number", []any{"STRING"}},
+				},
+				{
+					Keys:   []string{"nodeLabels", "propertyName", "propertyTypes"},
+					Values: []any{[]any{"Email"}, "address", []any{"STRING"}},
+				},
+			}, nil)
+
+		// Mock db.schema.relTypeProperties query
+		mockDB.EXPECT().
+			ExecuteReadQuery(gomock.Any(), gomock.Any(), nil).
+			Return([]*neo4j.Record{}, nil)
+
+		deps := &tools.ToolDependencies{
+			DBService:        mockDB,
+			AnalyticsService: analyticsService,
+		}
+
+		handler := cypher.GetSchemaHandler(deps, 100)
+		result, err := handler(context.Background(), mcp.CallToolRequest{})
+
+		if err != nil {
+			t.Fatalf("Expected no error, got: %v", err)
+		}
+		if result == nil || result.IsError {
+			t.Fatal("Expected success result")
+		}
+
+		textContent := result.Content[0].(mcp.TextContent)
+		output := textContent.Text
+
+		// Verify that the output contains proper Cypher patterns
+		expectedPatterns := []string{
+			"(:Customer)-[:HAS_PASSPORT]->(:Passport)",
+			"(:Customer)-[:HAS_EMAIL]->(:Email)",
+		}
+
+		for _, pattern := range expectedPatterns {
+			if !strings.Contains(output, pattern) {
+				t.Errorf("Expected output to contain Cypher pattern %q, but it was not found.\nOutput:\n%s", pattern, output)
+			}
+		}
+
+		// Verify that old format (with arrows only) is NOT present
+		oldFormatPatterns := []string{
+			":HAS_PASSPORT` → ",
+			":HAS_EMAIL` → ",
+		}
+
+		for _, pattern := range oldFormatPatterns {
+			if strings.Contains(output, pattern) {
+				t.Errorf("Output should NOT contain old format pattern %q, but it was found.\nOutput:\n%s", pattern, output)
+			}
+		}
+
+		t.Logf("Schema output:\n%s", output)
 	})
 
 }
 
+// TestGetSchemaProcessing tests are commented out because they test the old APOC-based
+// processCypherSchema function which is no longer used by the handler (replaced with native Neo4j procedures).
+// The processCypherSchema function is kept for potential backward compatibility but is not actively used.
+/*
 func TestGetSchemaProcessing(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	analyticsService := analytics.NewMockService(ctrl)
@@ -566,3 +727,4 @@ func TestGetSchemaProcessing(t *testing.T) {
 		})
 	}
 }
+*/

@@ -151,10 +151,10 @@ func getMockedDBService(ctrl *gomock.Controller, withGDS bool) *db.MockService {
 			},
 		},
 	}, nil)
-	checkApocMetaSchemaQuery := "SHOW PROCEDURES YIELD name WHERE name = 'apoc.meta.schema' RETURN count(name) > 0 AS apocMetaSchemaAvailable"
+	checkApocMetaSchemaQuery := "SHOW PROCEDURES YIELD name WHERE name = 'db.schema.visualization' RETURN count(name) > 0 AS schemaVisualizationAvailable"
 	mockDB.EXPECT().ExecuteReadQuery(gomock.Any(), checkApocMetaSchemaQuery, gomock.Any()).Times(1).Return([]*neo4j.Record{
 		{
-			Keys: []string{"apocMetaSchemaAvailable"},
+			Keys: []string{"schemaVisualizationAvailable"},
 			Values: []any{
 				bool(true),
 			},

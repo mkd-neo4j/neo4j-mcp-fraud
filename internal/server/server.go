@@ -50,8 +50,13 @@ func NewNeo4jMCPServer(version string, cfg *config.Config, dbService database.Se
 		"neo4j-mcp",
 		version,
 		server.WithToolCapabilities(true),
-		server.WithInstructions("This is the Neo4j official MCP server and can provide tool calling to interact with your Neo4j database,"+
-			"by inferring the schema with tools like get-schema and executing arbitrary Cypher queries with read-cypher."),
+		server.WithInstructions("This is the Neo4j official MCP server for fraud detection and banking applications. "+
+			"Available tools: "+
+			"get-schema (returns your database schema with fraud detection context), "+
+			"get-neo4j-reference-data-models (returns Neo4j reference patterns for guidance on extending schemas), "+
+			"detect-synthetic-identity (finds customers sharing PII for fraud detection), "+
+			"read-cypher and write-cypher (execute Cypher queries), "+
+			"list-gds-procedures (discover graph data science functions)."),
 	)
 
 	return &Neo4jMCPServer{
@@ -113,7 +118,7 @@ func parseAllowedOrigins(allowedOriginsStr string) []string {
 // verifyRequirements check the Neo4j requirements:
 // - A valid connection with a Neo4j instance.
 // - The ability to perform a read query (database name is correctly defined).
-// - Required plugin installed: APOC (specifically apoc.meta.schema as it's used for get-schema)
+// - Required procedures available: db.schema.* (native Neo4j procedures for schema introspection)
 // - In case GDS is not installed a flag is set in the server and tools will be registered accordingly
 // Note: In HTTP mode, these checks are skipped at startup since credentials come from per-request Basic Auth headers.
 func (s *Neo4jMCPServer) verifyRequirements() error {
@@ -125,12 +130,20 @@ func (s *Neo4jMCPServer) verifyRequirements() error {
 
 	err := s.dbService.VerifyConnectivity(context.Background())
 	if err != nil {
+		// Write to stderr for MCP protocol compliance
+		fmt.Fprintf(os.Stderr, "Failed to connect to Neo4j at %s: %v\n", s.config.URI, err)
+		fmt.Fprintf(os.Stderr, "Please verify:\n")
+		fmt.Fprintf(os.Stderr, "  - Neo4j is running and accessible\n")
+		fmt.Fprintf(os.Stderr, "  - NEO4J_URI is correct (currently: %s)\n", s.config.URI)
+		fmt.Fprintf(os.Stderr, "  - NEO4J_USERNAME and NEO4J_PASSWORD are valid\n")
 		return fmt.Errorf("impossible to verify connectivity with the Neo4j instance: %w", err)
 	}
 	// Perform a dummy query to verify correctness of the connection, VerifyConnectivity is not exhaustive.
 	records, err := s.dbService.ExecuteReadQuery(context.Background(), "RETURN 1 as first", map[string]any{})
 
 	if err != nil {
+		fmt.Fprintf(os.Stderr, "Failed to execute test query on Neo4j database '%s': %v\n", s.config.Database, err)
+		fmt.Fprintf(os.Stderr, "Please verify NEO4J_DATABASE is correct (currently: %s)\n", s.config.Database)
 		return fmt.Errorf("impossible to verify connectivity with the Neo4j instance: %w", err)
 	}
 	if len(records) != 1 || len(records[0].Values) != 1 {
@@ -140,21 +153,9 @@ func (s *Neo4jMCPServer) verifyRequirements() error {
 	if !ok || one != 1 {
 		return fmt.Errorf("failed to verify connectivity with the Neo4j instance: unexpected response from test query")
 	}
-	// Check for apoc.meta.schema procedure
-	checkApocMetaSchemaQuery := "SHOW PROCEDURES YIELD name WHERE name = 'apoc.meta.schema' RETURN count(name) > 0 AS apocMetaSchemaAvailable"
-
-	// Check for apoc.meta.schema availability
-	records, err = s.dbService.ExecuteReadQuery(context.Background(), checkApocMetaSchemaQuery, nil)
-	if err != nil {
-		return fmt.Errorf("failed to check for APOC availability: %w", err)
-	}
-	if len(records) != 1 || len(records[0].Values) != 1 {
-		return fmt.Errorf("failed to verify APOC availability: unexpected response from test query")
-	}
-	apocMetaSchemaAvailable, ok := records[0].Values[0].(bool)
-	if !ok || !apocMetaSchemaAvailable {
-		return fmt.Errorf("please ensure the APOC plugin is installed and includes the 'meta' component")
-	}
+	// Native schema procedures (db.schema.*) are available in Neo4j 4.0+
+	// We'll skip the explicit check here as it can block startup, and let the actual
+	// tool calls fail gracefully with proper error messages if procedures are missing
 	// Call gds.version procedure to determine if GDS is installed
 	records, err = s.dbService.ExecuteReadQuery(context.Background(), "RETURN gds.version() as gdsVersion", nil)
 	if err != nil {
