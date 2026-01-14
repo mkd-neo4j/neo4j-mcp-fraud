@@ -4,6 +4,7 @@ import (
 	"github.com/mark3labs/mcp-go/server"
 	"github.com/mkd-neo4j/neo4j-mcp-fraud/internal/tools"
 	"github.com/mkd-neo4j/neo4j-mcp-fraud/internal/tools/cypher"
+	"github.com/mkd-neo4j/neo4j-mcp-fraud/internal/tools/fraud/sar"
 	"github.com/mkd-neo4j/neo4j-mcp-fraud/internal/tools/fraud/synthetic_identity"
 	"github.com/mkd-neo4j/neo4j-mcp-fraud/internal/tools/gds"
 	"github.com/mkd-neo4j/neo4j-mcp-fraud/internal/tools/schema"
@@ -128,6 +129,14 @@ func (s *Neo4jMCPServer) getAllToolsDefs(deps *tools.ToolDependencies) []ToolDef
 			definition: server.ServerTool{
 				Tool:    synthetic_identity.Spec(),
 				Handler: synthetic_identity.Handler(deps),
+			},
+			readonly: true,
+		},
+		{
+			category: fraudCategory,
+			definition: server.ServerTool{
+				Tool:    sar.GetSARGuidanceSpec(),
+				Handler: sar.GetSARGuidanceHandler(deps),
 			},
 			readonly: true,
 		},
