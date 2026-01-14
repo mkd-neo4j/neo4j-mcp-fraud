@@ -3,7 +3,7 @@ package database_test
 import (
 	"testing"
 
-	"github.com/neo4j/mcp/internal/database"
+	"github.com/mkd-neo4j/neo4j-mcp-fraud/internal/database"
 	"github.com/neo4j/neo4j-go-driver/v5/neo4j"
 )
 

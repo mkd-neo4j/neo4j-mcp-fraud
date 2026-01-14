@@ -1,6 +1,6 @@
-# TLS/HTTPS Setup for Neo4j MCP Server
+# TLS/HTTPS Setup for Neo4j Fraud MCP Server
 
-This guide covers TLS/HTTPS configuration for the Neo4j MCP server, including certificate generation, testing, and production deployment.
+This guide covers TLS/HTTPS configuration for the Neo4j Fraud MCP server, including certificate generation, testing, and production deployment.
 
 ## Important Certificate Requirements
 
@@ -57,7 +57,7 @@ openssl req -x509 -newkey rsa:4096 \
 
 ```bash
 # Default port 443 when TLS is enabled
-./bin/neo4j-mcp \
+./bin/neo4j-fraud-mcp \
   --neo4j-uri bolt://localhost:7687 \
   --neo4j-transport-mode http \
   --neo4j-http-tls-enabled true \
@@ -65,7 +65,7 @@ openssl req -x509 -newkey rsa:4096 \
   --neo4j-http-tls-key-file key.pem
 
 # Or specify a custom port like 8443
-./bin/neo4j-mcp \
+./bin/neo4j-fraud-mcp \
   --neo4j-uri bolt://localhost:7687 \
   --neo4j-transport-mode http \
   --neo4j-http-port 8443 \
@@ -86,7 +86,7 @@ export NEO4J_MCP_HTTP_TLS_CERT_FILE="cert.pem"
 export NEO4J_MCP_HTTP_TLS_KEY_FILE="key.pem"
 # NEO4J_MCP_HTTP_PORT defaults to 443 when TLS is enabled
 
-./bin/neo4j-mcp
+./bin/neo4j-fraud-mcp
 ```
 
 ### 3. Test the Server
@@ -182,7 +182,7 @@ For production, use a proper certificate from a Certificate Authority (e.g., Let
 ```bash
 # With Let's Encrypt certificate (certificates include proper domain names)
 # Note: In HTTP mode, username/password are not needed here - credentials come from per-request Basic Auth
-./bin/neo4j-mcp \
+./bin/neo4j-fraud-mcp \
   --neo4j-uri bolt://localhost:7687 \
   --neo4j-transport-mode http \
   --neo4j-http-host 127.0.0.1 \

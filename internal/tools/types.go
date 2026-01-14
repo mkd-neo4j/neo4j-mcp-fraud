@@ -1,8 +1,8 @@
 package tools
 
 import (
-	"github.com/neo4j/mcp/internal/analytics"
-	"github.com/neo4j/mcp/internal/database"
+	"github.com/mkd-neo4j/neo4j-mcp-fraud/internal/analytics"
+	"github.com/mkd-neo4j/neo4j-mcp-fraud/internal/database"
 )
 
 // ToolDependencies contains all dependencies needed by tools

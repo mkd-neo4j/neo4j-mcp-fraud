@@ -11,10 +11,10 @@ import (
 // osExit is a variable that can be mocked in tests
 var osExit = os.Exit
 
-const helpText = `neo4j-mcp - Neo4j Model Context Protocol Server
+const helpText = `neo4j-fraud-mcp - Neo4j Fraud Detection Model Context Protocol Server
 
 Usage:
-  neo4j-mcp [OPTIONS]
+  neo4j-fraud-mcp [OPTIONS]
 
 Options:
   -h, --help                          Show this help message
@@ -59,7 +59,7 @@ Examples:
   # Using CLI flags (takes precedence over environment variables)
   neo4j-mcp --neo4j-uri bolt://localhost:7687 --neo4j-username neo4j --neo4j-password password
 
-For more information, visit: https://github.com/neo4j/mcp
+For more information, visit: https://github.com/mkd-neo4j/neo4j-mcp-fraud
 `
 
 // Args holds configuration values parsed from command-line flags
@@ -204,7 +204,7 @@ func HandleArgs(version string) {
 	}
 
 	if flags["version"] {
-		fmt.Printf("neo4j-mcp version: %s\n", version)
+		fmt.Printf("neo4j-fraud-mcp version: %s\n", version)
 		osExit(0)
 	}
 }

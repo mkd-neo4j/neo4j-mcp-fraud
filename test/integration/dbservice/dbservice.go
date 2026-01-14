@@ -6,8 +6,8 @@ import (
 	"context"
 	"log"
 
-	"github.com/neo4j/mcp/internal/config"
-	"github.com/neo4j/mcp/test/integration/containerrunner"
+	"github.com/mkd-neo4j/neo4j-mcp-fraud/internal/config"
+	"github.com/mkd-neo4j/neo4j-mcp-fraud/test/integration/containerrunner"
 	"github.com/neo4j/neo4j-go-driver/v5/neo4j"
 )
 

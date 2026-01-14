@@ -7,12 +7,12 @@ import (
 	"log/slog"
 	"strings"
 
-	"github.com/neo4j/mcp/internal/auth"
-	"github.com/neo4j/mcp/internal/config"
+	"github.com/mkd-neo4j/neo4j-mcp-fraud/internal/auth"
+	"github.com/mkd-neo4j/neo4j-mcp-fraud/internal/config"
 	"github.com/neo4j/neo4j-go-driver/v5/neo4j"
 )
 
-const appName string = "MCP4NEO4J"
+const appName string = "FRAUD-MCP4NEO4J"
 
 // Neo4jService is the concrete implementation of DatabaseService
 type Neo4jService struct {

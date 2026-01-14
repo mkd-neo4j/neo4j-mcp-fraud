@@ -14,9 +14,9 @@ import (
 	"time"
 
 	"github.com/mark3labs/mcp-go/server"
-	"github.com/neo4j/mcp/internal/analytics"
-	"github.com/neo4j/mcp/internal/config"
-	"github.com/neo4j/mcp/internal/database"
+	"github.com/mkd-neo4j/neo4j-mcp-fraud/internal/analytics"
+	"github.com/mkd-neo4j/neo4j-mcp-fraud/internal/config"
+	"github.com/mkd-neo4j/neo4j-mcp-fraud/internal/database"
 	"github.com/neo4j/neo4j-go-driver/v5/neo4j"
 )
 

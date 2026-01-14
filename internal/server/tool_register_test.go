@@ -4,10 +4,10 @@ import (
 	"fmt"
 	"testing"
 
-	analytics "github.com/neo4j/mcp/internal/analytics/mocks"
-	"github.com/neo4j/mcp/internal/config"
-	db "github.com/neo4j/mcp/internal/database/mocks"
-	"github.com/neo4j/mcp/internal/server"
+	analytics "github.com/mkd-neo4j/neo4j-mcp-fraud/internal/analytics/mocks"
+	"github.com/mkd-neo4j/neo4j-mcp-fraud/internal/config"
+	db "github.com/mkd-neo4j/neo4j-mcp-fraud/internal/database/mocks"
+	"github.com/mkd-neo4j/neo4j-mcp-fraud/internal/server"
 	"github.com/neo4j/neo4j-go-driver/v5/neo4j"
 	"go.uber.org/mock/gomock"
 )
@@ -34,8 +34,8 @@ func TestToolRegister(t *testing.T) {
 
 		// Expected tools that should be registered
 		// update this number when a tool is added or removed.
-		// Current tools: get-schema, read-cypher, write-cypher, list-gds-procedures
-		expectedTotalToolsCount := 4
+		// Current tools: get-schema, read-cypher, write-cypher, list-gds-procedures, detect-synthetic-identity, enrich-schema
+		expectedTotalToolsCount := 6
 
 		// Start server and register tools
 		err := s.Start()
@@ -64,8 +64,8 @@ func TestToolRegister(t *testing.T) {
 
 		// Expected tools that should be registered
 		// update this number when a tool is added or removed.
-		// Readonly tools: get-schema, read-cypher, list-gds-procedures
-		expectedTotalToolsCount := 3
+		// Readonly tools: get-schema, read-cypher, list-gds-procedures, detect-synthetic-identity, enrich-schema
+		expectedTotalToolsCount := 5
 
 		// Start server and register tools
 		err := s.Start()
@@ -93,8 +93,8 @@ func TestToolRegister(t *testing.T) {
 
 		// Expected tools that should be registered
 		// update this number when a tool is added or removed.
-		// All tools: get-schema, read-cypher, write-cypher, list-gds-procedures
-		expectedTotalToolsCount := 4
+		// All tools: get-schema, read-cypher, write-cypher, list-gds-procedures, detect-synthetic-identity, enrich-schema
+		expectedTotalToolsCount := 6
 
 		// Start server and register tools
 		err := s.Start()
@@ -123,8 +123,8 @@ func TestToolRegister(t *testing.T) {
 
 		// Expected tools that should be registered
 		// update this number when a tool is added or removed.
-		// Non-GDS tools: get-schema, read-cypher, write-cypher
-		expectedTotalToolsCount := 3
+		// Non-GDS tools: get-schema, read-cypher, write-cypher, detect-synthetic-identity, enrich-schema
+		expectedTotalToolsCount := 5
 
 		// Start server and register tools
 		err := s.Start()

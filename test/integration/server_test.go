@@ -8,10 +8,10 @@ import (
 	"testing"
 	"time"
 
-	"github.com/neo4j/mcp/internal/config"
-	"github.com/neo4j/mcp/internal/database"
-	"github.com/neo4j/mcp/internal/server"
-	"github.com/neo4j/mcp/test/integration/helpers"
+	"github.com/mkd-neo4j/neo4j-mcp-fraud/internal/config"
+	"github.com/mkd-neo4j/neo4j-mcp-fraud/internal/database"
+	"github.com/mkd-neo4j/neo4j-mcp-fraud/internal/server"
+	"github.com/mkd-neo4j/neo4j-mcp-fraud/test/integration/helpers"
 	"github.com/neo4j/neo4j-go-driver/v5/neo4j"
 )
 

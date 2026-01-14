@@ -1,15 +1,15 @@
 {
   "manifest_version": "0.3",
-  "name": "neo4j-mcp",
+  "name": "neo4j-fraud-mcp",
   "version": "1.0.0",
-  "description": "Official Model Context Protocol (MCP) server for Neo4j.",
+  "description": "Official Model Context Protocol (MCP) server for Neo4j, specialized for fraud detection and financial crime investigation.",
   "author": {
     "name": "Neo4j",
     "url": "https://neo4j.com/"
   },
-  "homepage": "https://github.com/neo4j/mcp",
-  "documentation": "https://neo4j.com/docs/mcp/",
-  "support": "https://github.com/neo4j/mcp/issues",
+  "homepage": "https://github.com/mkd-neo4j/neo4j-mcp-fraud",
+  "documentation": "https://neo4j.com/docs/fraud-mcp/",
+  "support": "https://github.com/mkd-neo4j/neo4j-mcp-fraud/issues",
   "user_config": {
     "NEO4J_URI": {
       "type": "string",
@@ -77,9 +77,9 @@
   },
   "server": {
     "type": "binary",
-    "entry_point": "neo4j-mcp",
+    "entry_point": "neo4j-fraud-mcp",
     "mcp_config": {
-      "command": "${__dirname}${/}bin/neo4j-mcp",
+      "command": "${__dirname}${/}bin/neo4j-fraud-mcp",
       "env": {
         "NEO4J_URI": "${user_config.NEO4J_URI}",
         "NEO4J_USERNAME": "${user_config.NEO4J_USERNAME}",
@@ -117,14 +117,18 @@
   "keywords": [
     "Neo4j",
     "MCP",
-    "Neo4j MCP",
-    "Neo4j MCP Server",
-    "Neo4j Official MCP Server",
-    "neo4j-mcp"
+    "Fraud Detection",
+    "Neo4j Fraud MCP",
+    "Neo4j Fraud MCP Server",
+    "Neo4j Official Fraud MCP Server",
+    "neo4j-fraud-mcp",
+    "Financial Crime",
+    "AML",
+    "Anti-Money Laundering"
   ],
   "license": "GPL",
   "repository": {
     "type": "git",
-    "url": "https://github.com/neo4j/mcp"
+    "url": "https://github.com/mkd-neo4j/neo4j-mcp-fraud"
   }
 }

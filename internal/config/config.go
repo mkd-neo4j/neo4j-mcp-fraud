@@ -8,7 +8,7 @@ import (
 	"slices"
 	"strconv"
 
-	"github.com/neo4j/mcp/internal/logger"
+	"github.com/mkd-neo4j/neo4j-mcp-fraud/internal/logger"
 )
 
 const (

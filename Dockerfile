@@ -1,7 +1,7 @@
 # Builder stage
 FROM golang:1.25-alpine@sha256:26111811bc967321e7b6f852e914d14bede324cd1accb7f81811929a6a57fea9 AS builder
 
-LABEL io.modelcontextprotocol.server.name="io.github.neo4j/mcp"
+LABEL io.modelcontextprotocol.server.name="io.github.neo4j/fraud-mcp"
 
 WORKDIR /build
 
@@ -18,8 +18,8 @@ RUN go mod download
 COPY . .
 
 # Build the binary
-RUN CGO_ENABLED=0 GOOS=linux go build -C cmd/neo4j-mcp -a -installsuffix cgo \
-    -o ../../neo4j-mcp
+RUN CGO_ENABLED=0 GOOS=linux go build -C cmd/neo4j-fraud-mcp -a -installsuffix cgo \
+    -o ../../neo4j-fraud-mcp
 
 # Runtime stage
 FROM scratch
@@ -27,7 +27,7 @@ FROM scratch
 WORKDIR /app
 
 # Copy binary from builder
-COPY --from=builder /build/neo4j-mcp /app/neo4j-mcp
+COPY --from=builder /build/neo4j-fraud-mcp /app/neo4j-fraud-mcp
 
 # Copy CA certificates for HTTPS connections
 COPY --from=builder /etc/ssl/certs/ca-certificates.crt /etc/ssl/certs/ca-certificates.crt
@@ -36,4 +36,4 @@ COPY --from=builder /etc/ssl/certs/ca-certificates.crt /etc/ssl/certs/ca-certifi
 USER 65532:65532
 
 # Set entrypoint
-ENTRYPOINT ["/app/neo4j-mcp"]
+ENTRYPOINT ["/app/neo4j-fraud-mcp"]

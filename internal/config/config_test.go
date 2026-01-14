@@ -4,7 +4,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/neo4j/mcp/internal/testutil"
+	"github.com/mkd-neo4j/neo4j-mcp-fraud/internal/testutil"
 )
 
 func TestConfig_Validate(t *testing.T) {

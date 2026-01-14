@@ -5,7 +5,7 @@ import (
 	"net/http"
 	"slices"
 
-	"github.com/neo4j/mcp/internal/auth"
+	"github.com/mkd-neo4j/neo4j-mcp-fraud/internal/auth"
 )
 
 const (

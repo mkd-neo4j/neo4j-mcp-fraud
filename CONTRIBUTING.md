@@ -1,6 +1,6 @@
-# Contributing to Neo4j MCP
+# Contributing to Neo4j Fraud MCP
 
-Thank you for your interest in contributing to the Neo4j MCP server! This document provides guidelines and information for contributors.
+Thank you for your interest in contributing to the Neo4j Fraud MCP server! This document provides guidelines and information for contributors.
 
 If you're an external contributor you must sign the [https://neo4j.com/developer/contributing-code/#sign-cla](https://neo4j.com/developer/contributing-code/#sign-cla)
 
@@ -13,10 +13,10 @@ Please read and follow these guidelines to ensure a welcoming environment for ev
 - Go 1.25+ (see `go.mod`)
 - A Neo4j instance with APOC plugin installed.
 
-## Clone the repository (forks are currently disabled)
+## Clone the repository
 
 ```bash
-git clone git@github.com:neo4j/mcp.git && cd mcp
+git clone git@github.com:mkd-neo4j/neo4j-mcp-fraud.git && cd neo4j-mcp-fraud
 ```
 
 ## Install Dependencies
@@ -83,13 +83,13 @@ go test ./... -cover
 go test ./internal/tools -v
 
 # Build binary
-go build -C cmd/neo4j-mcp -o ../../bin/
+go build -C cmd/neo4j-fraud-mcp -o ../../bin/
 
 # Run from source
-go run ./cmd/neo4j-mcp
+go run ./cmd/neo4j-fraud-mcp
 
 # Optional: install (should be run from repo root)
-go install -C cmd/neo4j-mcp
+go install -C cmd/neo4j-fraud-mcp
 ```
 
 ## Mocks
@@ -122,10 +122,10 @@ See `internal/tools/cypher/get_schema_handler_test.go` for a fuller pattern.
 
 ## Testing using the @modelcontextprotocol/inspector:
 
-The Neo4j MCP capabilities can be tested using the `@modelcontextprotocol/inspector`:
+The Neo4j Fraud MCP capabilities can be tested using the `@modelcontextprotocol/inspector`:
 
 ```bash
-npx @modelcontextprotocol/inspector go run ./cmd/neo4j-mcp
+npx @modelcontextprotocol/inspector go run ./cmd/neo4j-fraud-mcp
 ```
 
 ## Testing HTTP Mode
@@ -158,7 +158,7 @@ export NEO4J_URI="bolt://localhost:7687"
 export NEO4J_MCP_TRANSPORT="http"
 
 # Run server
-go run ./cmd/neo4j-mcp
+go run ./cmd/neo4j-fraud-mcp
 ```
 
 Test with curl:
@@ -331,10 +331,23 @@ If your changes impact the end-user configuration (e.g., adding new environment 
 
 For more information refer to the dedicated guide: [the MCPB build documentation](docs/BUILD_MCPB.md).
 
+### Fraud Detection Tools
+
+When contributing fraud detection tools, please:
+
+1. Follow the package structure in `internal/tools/fraud/`
+2. Each tool should have its own subdirectory with `handler.go`, `handler_test.go`, and `spec.go`
+3. Provide comprehensive test coverage with mocked dependencies
+4. Document expected data model and query patterns
+5. Include example use cases in the tool specification
+6. Ensure tools are read-only by default unless write access is explicitly required
+
+For detailed fraud tool design guidelines, see [docs/fraud-mcp/FRAUD_TOOLS_DESIGN.md](docs/fraud-mcp/FRAUD_TOOLS_DESIGN.md).
+
 ### Getting Help
 
-- Check existing [GitHub Issues](https://github.com/neo4j/mcp/issues)
+- Check existing [GitHub Issues](https://github.com/mkd-neo4j/neo4j-mcp-fraud/issues)
 - Ask questions in pull request discussions
 - Reach out to maintainers for complex architectural questions
 
-Thank you for contributing to making Neo4j MCP better!
+Thank you for contributing to making Neo4j Fraud MCP better!

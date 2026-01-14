@@ -5,7 +5,7 @@ import (
 	"net/http/httptest"
 	"testing"
 
-	"github.com/neo4j/mcp/internal/auth"
+	"github.com/mkd-neo4j/neo4j-mcp-fraud/internal/auth"
 )
 
 // mockHandler is a simple handler that returns 200 OK

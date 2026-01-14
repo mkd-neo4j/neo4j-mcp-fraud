@@ -1,6 +1,6 @@
 ## Build MCPB Bundle (for Claude Desktop)
 
-You can package the MCP server into an `.mcpb` bundle for distribution with MCP clients (e.g., Anthropic/Claude).
+You can package the Fraud MCP server into an `.mcpb` bundle for distribution with MCP clients (e.g., Anthropic/Claude).
 see more details here: https://github.com/modelcontextprotocol/mcpb/.
 
 ### Important: Bundle configuration files
@@ -15,10 +15,10 @@ The final `.mcpb` build depends on:
 npm install -g @anthropic-ai/mcpb
 
 # build binaries for your OS/Architecture
-go build -C cmd/neo4j-mcp -o ../../bin/
+go build -C cmd/neo4j-fraud-mcp -o ../../bin/
 
 # Build bundle from the repository root with a custom name
-mcpb pack . neo4j-official-mcp-1.0.0.mcpb
+mcpb pack . neo4j-fraud-mcp-1.0.0.mcpb
 ```
 
 You can now go to your Claude Desktop and install the bundle just created.

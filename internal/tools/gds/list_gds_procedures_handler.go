@@ -6,7 +6,7 @@ import (
 	"log/slog"
 
 	"github.com/mark3labs/mcp-go/mcp"
-	"github.com/neo4j/mcp/internal/tools"
+	"github.com/mkd-neo4j/neo4j-mcp-fraud/internal/tools"
 )
 
 const listGdsProceduresQuery = `

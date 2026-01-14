@@ -13,10 +13,10 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/mark3labs/mcp-go/mcp"
-	analytics "github.com/neo4j/mcp/internal/analytics/mocks"
-	"github.com/neo4j/mcp/internal/config"
-	"github.com/neo4j/mcp/internal/database"
-	"github.com/neo4j/mcp/internal/tools"
+	analytics "github.com/mkd-neo4j/neo4j-mcp-fraud/internal/analytics/mocks"
+	"github.com/mkd-neo4j/neo4j-mcp-fraud/internal/config"
+	"github.com/mkd-neo4j/neo4j-mcp-fraud/internal/database"
+	"github.com/mkd-neo4j/neo4j-mcp-fraud/internal/tools"
 	"github.com/neo4j/neo4j-go-driver/v5/neo4j"
 	"go.uber.org/mock/gomock"
 )

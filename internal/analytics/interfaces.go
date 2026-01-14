@@ -1,6 +1,6 @@
 package analytics
 
-//go:generate mockgen -destination=mocks/mock_analytics.go -package=analytics_mocks -typed github.com/neo4j/mcp/internal/analytics Service,HTTPClient
+//go:generate mockgen -destination=mocks/mock_analytics.go -package=analytics_mocks -typed github.com/mkd-neo4j/neo4j-mcp-fraud/internal/analytics Service,HTTPClient
 import (
 	"io"
 	"net/http"

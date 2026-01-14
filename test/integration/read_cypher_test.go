@@ -6,8 +6,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/neo4j/mcp/internal/tools/cypher"
-	"github.com/neo4j/mcp/test/integration/helpers"
+	"github.com/mkd-neo4j/neo4j-mcp-fraud/internal/tools/cypher"
+	"github.com/mkd-neo4j/neo4j-mcp-fraud/test/integration/helpers"
 )
 
 func TestReadCypher(t *testing.T) {

@@ -1,6 +1,6 @@
-# MCP Client Setup Guide
+# Fraud MCP Client Setup Guide
 
-This guide covers how to configure various MCP clients (VSCode, Claude Desktop, etc.) to use the Neo4j MCP server.
+This guide covers how to configure various MCP clients (VSCode, Claude Desktop, etc.) to use the Neo4j Fraud MCP server.
 
 The server supports two transport modes:
 - **STDIO** (default): For desktop clients (Claude Desktop, VSCode)
@@ -82,9 +82,9 @@ Create or edit `mcp.json` (docs: https://code.visualstudio.com/docs/copilot/cust
 ```json
 {
   "servers": {
-    "neo4j": {
+    "neo4j-fraud": {
       "type": "stdio",
-      "command": "neo4j-mcp",
+      "command": "neo4j-fraud-mcp",
       "env": {
         "NEO4J_URI": "bolt://localhost:7687",
         "NEO4J_USERNAME": "neo4j",
@@ -103,16 +103,16 @@ Create or edit `mcp.json` (docs: https://code.visualstudio.com/docs/copilot/cust
 
 **Note:** The first three environment variables (NEO4J_URI, NEO4J_USERNAME, NEO4J_PASSWORD) are **required**. The server will fail to start if any of these are missing.
 
-Restart VSCode; open Copilot Chat and ask: "List Neo4j MCP tools" to confirm.
+Restart VSCode; open Copilot Chat and ask: "List Neo4j Fraud MCP tools" to confirm.
 
 ### HTTP Mode
 
-First, start your Neo4j MCP server in HTTP mode:
+First, start your Neo4j Fraud MCP server in HTTP mode:
 
 ```bash
 export NEO4J_URI="bolt://localhost:7687"
 export NEO4J_MCP_TRANSPORT="http"
-neo4j-mcp
+neo4j-fraud-mcp
 ```
 
 The server will start on `http://127.0.0.1:80` by default.
@@ -122,7 +122,7 @@ Then create or edit your `mcp.json` file:
 ```json
 {
   "servers": {
-    "neo4j-http": {
+    "neo4j-fraud-http": {
       "type": "http",
       "url": "http://127.0.0.1:80/mcp",
       "headers": {
@@ -158,14 +158,14 @@ Open your Claude for Desktop App configuration at:
 - (MacOS/Linux) `~/Library/Application Support/Claude/claude_desktop_config.json`
 - (Windows) `path_to_your\claude_desktop_config.json`
 
-Create the file if it doesn't exist, then add the `neo4j-mcp` server:
+Create the file if it doesn't exist, then add the `neo4j-fraud-mcp` server:
 
 ```json
 {
   "mcpServers": {
-    "neo4j-mcp": {
+    "neo4j-fraud-mcp": {
       "type": "stdio",
-      "command": "neo4j-mcp",
+      "command": "neo4j-fraud-mcp",
       "args": [],
       "env": {
         "NEO4J_URI": "bolt://localhost:7687",
@@ -191,7 +191,7 @@ Create the file if it doesn't exist, then add the `neo4j-mcp` server:
 
 ### HTTP Mode
 
-First, start your Neo4j MCP server in HTTP mode (see [HTTP Mode](#http-mode) section above).
+First, start your Neo4j Fraud MCP server in HTTP mode (see [HTTP Mode](#http-mode) section above).
 
 Then edit your Claude Desktop configuration file:
 
@@ -205,7 +205,7 @@ Then edit your Claude Desktop configuration file:
 ```json
 {
   "mcpServers": {
-    "neo4j-http": {
+    "neo4j-fraud-http": {
       "type": "http",
       "url": "http://127.0.0.1:80/mcp",
       "headers": {

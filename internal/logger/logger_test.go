@@ -6,7 +6,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/neo4j/mcp/internal/logger"
+	"github.com/mkd-neo4j/neo4j-mcp-fraud/internal/logger"
 )
 
 func TestLogLevelChange(t *testing.T) {

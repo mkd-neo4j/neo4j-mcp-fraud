@@ -8,8 +8,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/neo4j/mcp/internal/analytics"
-	amocks "github.com/neo4j/mcp/internal/analytics/mocks"
+	"github.com/mkd-neo4j/neo4j-mcp-fraud/internal/analytics"
+	amocks "github.com/mkd-neo4j/neo4j-mcp-fraud/internal/analytics/mocks"
 	"go.uber.org/mock/gomock"
 )
 

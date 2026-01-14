@@ -2,9 +2,11 @@ package server
 
 import (
 	"github.com/mark3labs/mcp-go/server"
-	"github.com/neo4j/mcp/internal/tools"
-	"github.com/neo4j/mcp/internal/tools/cypher"
-	"github.com/neo4j/mcp/internal/tools/gds"
+	"github.com/mkd-neo4j/neo4j-mcp-fraud/internal/tools"
+	"github.com/mkd-neo4j/neo4j-mcp-fraud/internal/tools/cypher"
+	"github.com/mkd-neo4j/neo4j-mcp-fraud/internal/tools/fraud/synthetic_identity"
+	"github.com/mkd-neo4j/neo4j-mcp-fraud/internal/tools/gds"
+	"github.com/mkd-neo4j/neo4j-mcp-fraud/internal/tools/schema"
 )
 
 // registerTools registers all enabled MCP tools and adds them to the provided MCP server.
@@ -26,6 +28,8 @@ type toolCategory int
 const (
 	cypherCategory toolCategory = 0
 	gdsCategory    toolCategory = 1
+	fraudCategory  toolCategory = 2
+	schemaCategory toolCategory = 3
 )
 
 type ToolDefinition struct {
@@ -115,6 +119,24 @@ func (s *Neo4jMCPServer) getAllToolsDefs(deps *tools.ToolDependencies) []ToolDef
 			definition: server.ServerTool{
 				Tool:    gds.ListGDSProceduresSpec(),
 				Handler: gds.ListGdsProceduresHandler(deps),
+			},
+			readonly: true,
+		},
+		// Fraud Detection Category/Section
+		{
+			category: fraudCategory,
+			definition: server.ServerTool{
+				Tool:    synthetic_identity.Spec(),
+				Handler: synthetic_identity.Handler(deps),
+			},
+			readonly: true,
+		},
+		// Schema Enrichment Category/Section
+		{
+			category: schemaCategory,
+			definition: server.ServerTool{
+				Tool:    schema.EnrichSchemaSpec(),
+				Handler: schema.EnrichSchemaHandler(deps, s.config.SchemaSampleSize),
 			},
 			readonly: true,
 		},

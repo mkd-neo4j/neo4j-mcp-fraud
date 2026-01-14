@@ -1,11 +1,31 @@
-# Neo4j MCP
+# Neo4j Fraud MCP
 
-Official Model Context Protocol (MCP) server for Neo4j.
+Official Model Context Protocol (MCP) server for Neo4j, specialized for fraud detection and financial crime investigation.
 
 ## Links
 
-- [Documentation](https://neo4j.com/docs/mcp/current/)
+- [Documentation](https://neo4j.com/docs/fraud-mcp/current/)
 - [Discord](https://discord.gg/neo4j)
+
+## Overview
+
+The Neo4j Fraud MCP server is purpose-built for financial crime analysts, AML investigators, and compliance officers. It combines Neo4j's powerful graph database capabilities with specialized fraud detection tools to accelerate investigations, lower the barrier to entry for analysts who may not be Cypher experts, and leverage Neo4j's strengths in pattern matching, deep traversals, and relationship analysis.
+
+### Target Users
+
+- **Fraud Analysts**: Investigating suspicious transactions and customer behavior
+- **AML Investigators**: Conducting anti-money laundering investigations
+- **KYC/CDD Officers**: Performing know-your-customer and customer due diligence checks
+- **Compliance Teams**: Monitoring for regulatory compliance
+
+### Key Use Cases
+
+1. **Transaction Monitoring**: Detecting unusual transaction patterns, circular flows, velocity anomalies
+2. **KYC/CDD Compliance**: Validating documentation completeness, identifying missing/expired documents
+3. **Network Analysis**: Finding connections to known bad actors, PEPs (Politically Exposed Persons)
+4. **Device & Identity Fraud**: Detecting shared devices, credentials, and addresses
+5. **Risk Assessment**: Evaluating exposure to high-risk jurisdictions and entities
+6. **Synthetic Identity Detection**: Identifying fraudulent identity patterns and suspicious account behavior
 
 ## Prerequisites
 
@@ -32,35 +52,35 @@ If an optional dependency is missing, the server will start in an adaptive mode.
 
 ## Installation (Binary)
 
-Releases: https://github.com/neo4j/mcp/releases
+Releases: https://github.com/mkd-neo4j/neo4j-mcp-fraud/releases
 
 1. Download the archive for your OS/arch.
-2. Extract and place `neo4j-mcp` in a directory present in your PATH variables (see examples below).
+2. Extract and place `neo4j-fraud-mcp` in a directory present in your PATH variables (see examples below).
 
 Mac / Linux:
 
 ```bash
-chmod +x neo4j-mcp
-sudo mv neo4j-mcp /usr/local/bin/
+chmod +x neo4j-fraud-mcp
+sudo mv neo4j-fraud-mcp /usr/local/bin/
 ```
 
 Windows (PowerShell / cmd):
 
 ```powershell
-move neo4j-mcp.exe C:\Windows\System32
+move neo4j-fraud-mcp.exe C:\Windows\System32
 ```
 
-Verify the neo4j-mcp installation:
+Verify the neo4j-fraud-mcp installation:
 
 ```bash
-neo4j-mcp -v
+neo4j-fraud-mcp -v
 ```
 
 Should print the installed version.
 
 ## Transport Modes
 
-The Neo4j MCP server supports two transport modes:
+The Neo4j Fraud MCP server supports two transport modes:
 
 - **STDIO** (default): Standard MCP communication via stdin/stdout for desktop clients (Claude Desktop, VSCode)
 - **HTTP**: RESTful HTTP server with per-request Basic Authentication for web-based clients and multi-tenant scenarios
@@ -101,7 +121,7 @@ export NEO4J_MCP_HTTP_TLS_ENABLED="true"
 export NEO4J_MCP_HTTP_TLS_CERT_FILE="/path/to/cert.pem"
 export NEO4J_MCP_HTTP_TLS_KEY_FILE="/path/to/key.pem"
 
-neo4j-mcp
+neo4j-fraud-mcp
 # Server will listen on https://127.0.0.1:443 by default
 ```
 
@@ -111,7 +131,7 @@ For detailed instructions on certificate generation, testing TLS, and production
 
 ## Configuration Options
 
-The `neo4j-mcp` server can be configured using environment variables or CLI flags. CLI flags take precedence over environment variables.
+The `neo4j-fraud-mcp` server can be configured using environment variables or CLI flags. CLI flags take precedence over environment variables.
 
 ### Environment Variables
 
@@ -122,7 +142,7 @@ See the [Client Setup Guide](docs/CLIENT_SETUP.md) for configuration examples.
 You can override any environment variable using CLI flags:
 
 ```bash
-neo4j-mcp --neo4j-uri "bolt://localhost:7687" \
+neo4j-fraud-mcp --neo4j-uri "bolt://localhost:7687" \
           --neo4j-username "neo4j" \
           --neo4j-password "password" \
           --neo4j-database "neo4j" \
@@ -146,17 +166,17 @@ Available flags:
 - `--neo4j-http-tls-cert-file` - Path to TLS certificate file (overrides NEO4J_MCP_HTTP_TLS_CERT_FILE)
 - `--neo4j-http-tls-key-file` - Path to TLS private key file (overrides NEO4J_MCP_HTTP_TLS_KEY_FILE)
 
-Use `neo4j-mcp --help` to see all available options.
+Use `neo4j-fraud-mcp --help` to see all available options.
 
 ## Client Configuration
 
-To configure MCP clients (VSCode, Claude Desktop, etc.) to use the Neo4j MCP server, see:
+To configure MCP clients (VSCode, Claude Desktop, etc.) to use the Neo4j Fraud MCP server, see:
 
 📘 **[Client Setup Guide](docs/CLIENT_SETUP.md)** – Complete configuration for STDIO and HTTP modes
 
 ## Tools & Usage
 
-Provided tools:
+### Core Tools
 
 | Tool                  | ReadOnly | Purpose                                              | Notes                                                                                                                          |
 | --------------------- | -------- | ---------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------ |
@@ -165,6 +185,14 @@ Provided tools:
 | `write-cypher`        | `false`  | Execute arbitrary Cypher (write mode)                | **Caution:** LLM-generated queries could cause harm. Use only in development environments. Disabled if `NEO4J_READ_ONLY=true`. |
 | `list-gds-procedures` | `true`   | List GDS procedures available in the Neo4j instance  | Help the client LLM to have a better visibility on the GDS procedures available                                                |
 
+### Fraud Detection Tools
+
+| Tool                        | ReadOnly | Purpose                                                    | Notes                                                                                      |
+| --------------------------- | -------- | ---------------------------------------------------------- | ------------------------------------------------------------------------------------------ |
+| `detect-synthetic-identity` | `true`   | Detect synthetic identity fraud patterns                   | Identifies suspicious account behavior, shared devices/addresses, and fraud ring patterns  |
+
+For detailed fraud tool documentation, see [docs/fraud-mcp/](docs/fraud-mcp/).
+
 ### Readonly mode flag
 
 Enable readonly mode by setting the `NEO4J_READ_ONLY` environment variable to `true` (for example, `"NEO4J_READ_ONLY": "true"`). Accepted values are `true` or `false` (default: `false`).
@@ -172,7 +200,7 @@ Enable readonly mode by setting the `NEO4J_READ_ONLY` environment variable to `t
 You can also override this setting using the `--neo4j-read-only` CLI flag:
 
 ```bash
-neo4j-mcp --neo4j-uri "bolt://localhost:7687" --neo4j-username "neo4j" --neo4j-password "password" --neo4j-read-only true
+neo4j-fraud-mcp --neo4j-uri "bolt://localhost:7687" --neo4j-username "neo4j" --neo4j-password "password" --neo4j-read-only true
 ```
 
 When enabled, write tools (for example, `write-cypher`) are not exposed to clients.
@@ -192,9 +220,16 @@ Important notes:
 
 Below are some example prompts you can try in Copilot or any other MCP client:
 
+### General Database Exploration
 - "What does my Neo4j instance contain? List all node labels, relationship types, and property keys."
 - "Find all Person nodes and their relationships in my Neo4j instance."
-- "Create a new User node with a name 'John' in my Neo4j instance."
+
+### Fraud Detection Examples
+- "Detect synthetic identity fraud patterns for customer ID 12345"
+- "Find all accounts that share the same device or IP address with account ABC123"
+- "Show me circular transaction flows involving account XYZ789"
+- "Identify accounts connected to known fraudsters within 2 hops"
+- "Find customers with missing or expired KYC documents"
 
 ## Security tips:
 
@@ -220,7 +255,7 @@ Controls the output format:
 
 ## Telemetry
 
-By default, `neo4j-mcp` collects anonymous usage data to help us improve the product.
+By default, `neo4j-fraud-mcp` collects anonymous usage data to help us improve the product.
 This includes information like the tools being used, the operating system, and CPU architecture.
 We do not collect any personal or sensitive information.
 

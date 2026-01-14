@@ -10,7 +10,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/neo4j/mcp/internal/config"
+	"github.com/mkd-neo4j/neo4j-mcp-fraud/internal/config"
 	"github.com/neo4j/neo4j-go-driver/v5/neo4j"
 	"github.com/testcontainers/testcontainers-go"
 	"github.com/testcontainers/testcontainers-go/wait"

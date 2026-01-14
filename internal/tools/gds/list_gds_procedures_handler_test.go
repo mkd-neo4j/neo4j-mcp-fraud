@@ -6,10 +6,10 @@ import (
 	"testing"
 
 	"github.com/mark3labs/mcp-go/mcp"
-	analytics "github.com/neo4j/mcp/internal/analytics/mocks"
-	db "github.com/neo4j/mcp/internal/database/mocks"
-	"github.com/neo4j/mcp/internal/tools"
-	"github.com/neo4j/mcp/internal/tools/gds"
+	analytics "github.com/mkd-neo4j/neo4j-mcp-fraud/internal/analytics/mocks"
+	db "github.com/mkd-neo4j/neo4j-mcp-fraud/internal/database/mocks"
+	"github.com/mkd-neo4j/neo4j-mcp-fraud/internal/tools"
+	"github.com/mkd-neo4j/neo4j-mcp-fraud/internal/tools/gds"
 	"github.com/neo4j/neo4j-go-driver/v5/neo4j"
 	"go.uber.org/mock/gomock"
 )

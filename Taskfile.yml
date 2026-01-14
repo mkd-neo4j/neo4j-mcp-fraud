@@ -12,13 +12,13 @@ version: "3"
 tasks:
   build:
     cmds:
-      - go build -C cmd/neo4j-mcp -o ../../bin/ {{.CLI_ARGS}}
+      - go build -C cmd/neo4j-fraud-mcp -o ../../bin/ {{.CLI_ARGS}}
   run:
     cmds:
-      - go run ./cmd/neo4j-mcp
+      - go run ./cmd/neo4j-fraud-mcp
   run:compiled:
     cmds:
-      - ./bin/neo4j-mcp {{.CLI_ARGS}}
+      - ./bin/neo4j-fraud-mcp {{.CLI_ARGS}}
   generate:
     cmds:
       - go generate ./...
@@ -40,4 +40,4 @@ tasks:
       - golangci-lint run
   inspect:
     cmds:
-      - npx @modelcontextprotocol/inspector go run ./cmd/neo4j-mcp
+      - npx @modelcontextprotocol/inspector go run ./cmd/neo4j-fraud-mcp
