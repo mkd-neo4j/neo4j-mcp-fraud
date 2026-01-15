@@ -50,6 +50,18 @@ func handleDetectSyntheticIdentity(ctx context.Context, request mcp.CallToolRequ
 		return mcp.NewToolResultError(errMessage), nil
 	}
 
+	if args.EntityConfig.NodeLabel == "" {
+		errMessage := "entityConfig.nodeLabel is required. Specify the entity node label to search (e.g., 'Customer', 'Person', 'Account')."
+		slog.Error(errMessage)
+		return mcp.NewToolResultError(errMessage), nil
+	}
+
+	if args.EntityConfig.IdProperty == "" {
+		errMessage := "entityConfig.idProperty is required. Specify the property name containing the unique identifier (e.g., 'customerId', 'personId')."
+		slog.Error(errMessage)
+		return mcp.NewToolResultError(errMessage), nil
+	}
+
 	// Set defaults
 	minShared := args.MinSharedAttributes
 	if minShared == 0 {
@@ -62,11 +74,12 @@ func handleDetectSyntheticIdentity(ctx context.Context, request mcp.CallToolRequ
 	}
 
 	// Determine operation mode
-	isInvestigationMode := args.CustomerId != ""
+	isInvestigationMode := args.EntityId != ""
 
 	slog.Info("detecting synthetic identity fraud",
 		"mode", map[bool]string{true: "investigation", false: "discovery"}[isInvestigationMode],
-		"customerId", args.CustomerId,
+		"entityId", args.EntityId,
+		"entityLabel", args.EntityConfig.NodeLabel,
 		"piiRelationships", len(args.PIIRelationships),
 		"minSharedAttributes", minShared,
 		"limit", limit)
@@ -76,16 +89,16 @@ func handleDetectSyntheticIdentity(ctx context.Context, request mcp.CallToolRequ
 	var params map[string]any
 
 	if isInvestigationMode {
-		// Investigation mode: find customers sharing PII with a specific customer
-		query = buildInvestigationQuery(args.PIIRelationships)
+		// Investigation mode: find entities sharing PII with a specific entity
+		query = buildInvestigationQuery(args.EntityConfig, args.PIIRelationships)
 		params = map[string]any{
-			"customerId":          args.CustomerId,
+			"entityId":            args.EntityId,
 			"minSharedAttributes": minShared,
 			"limit":               limit,
 		}
 	} else {
-		// Discovery mode: find all clusters of customers sharing PII
-		query = buildDiscoveryQuery(args.PIIRelationships)
+		// Discovery mode: find all clusters of entities sharing PII
+		query = buildDiscoveryQuery(args.EntityConfig, args.PIIRelationships)
 		params = map[string]any{
 			"minSharedAttributes": minShared,
 			"limit":               limit,
@@ -109,16 +122,17 @@ func handleDetectSyntheticIdentity(ctx context.Context, request mcp.CallToolRequ
 	return mcp.NewToolResultText(response), nil
 }
 
-// buildInvestigationQuery constructs a Cypher query for investigation mode (specific customer)
-func buildInvestigationQuery(piiRelationships []PIIRelationship) string {
+// buildInvestigationQuery constructs a Cypher query for investigation mode (specific entity)
+func buildInvestigationQuery(entityConfig EntityConfig, piiRelationships []PIIRelationship) string {
 	relPattern, caseStatement := buildQueryComponents(piiRelationships)
+	returnClause := buildReturnClause(entityConfig, "other")
 
-	// Investigation mode: find customers sharing PII with a specific target customer
+	// Investigation mode: find entities sharing PII with a specific target entity
 	query := fmt.Sprintf(`
-		MATCH (target:Customer {customerId: $customerId})
+		MATCH (target:%s {%s: $entityId})
 		MATCH (target)-[r:%s]->(identifier)
-		MATCH (identifier)<-[r2:%s]-(other:Customer)
-		WHERE target.customerId <> other.customerId
+		MATCH (identifier)<-[r2:%s]-(other:%s)
+		WHERE target.%s <> other.%s
 		WITH other,
 		     collect(DISTINCT {
 		         type: type(r2),
@@ -128,27 +142,30 @@ func buildInvestigationQuery(piiRelationships []PIIRelationship) string {
 		         END
 		     }) as sharedAttributes
 		WHERE size(sharedAttributes) >= $minSharedAttributes
-		RETURN other.customerId as customerId,
-		       other.firstName as firstName,
-		       other.lastName as lastName,
+		RETURN %s,
 		       sharedAttributes,
 		       size(sharedAttributes) as sharedAttributeCount
 		ORDER BY sharedAttributeCount DESC
 		LIMIT $limit
-	`, relPattern, relPattern, caseStatement)
+	`, entityConfig.NodeLabel, entityConfig.IdProperty,
+		relPattern, relPattern, entityConfig.NodeLabel,
+		entityConfig.IdProperty, entityConfig.IdProperty,
+		caseStatement, returnClause)
 
 	return query
 }
 
 // buildDiscoveryQuery constructs a Cypher query for discovery mode (find all clusters)
-func buildDiscoveryQuery(piiRelationships []PIIRelationship) string {
+func buildDiscoveryQuery(entityConfig EntityConfig, piiRelationships []PIIRelationship) string {
 	relPattern, caseStatement := buildQueryComponents(piiRelationships)
+	returnClause1 := buildReturnClause(entityConfig, "e1")
+	returnClause2 := buildReturnClause(entityConfig, "e2")
 
-	// Discovery mode: find all pairs of customers sharing PII
+	// Discovery mode: find all pairs of entities sharing PII
 	query := fmt.Sprintf(`
-		MATCH (c1:Customer)-[r1:%s]->(identifier)<-[r2:%s]-(c2:Customer)
-		WHERE id(c1) < id(c2)
-		WITH c1, c2,
+		MATCH (e1:%s)-[r1:%s]->(identifier)<-[r2:%s]-(e2:%s)
+		WHERE id(e1) < id(e2)
+		WITH e1, e2,
 		     collect(DISTINCT {
 		         type: type(r1),
 		         identifier: CASE
@@ -157,20 +174,50 @@ func buildDiscoveryQuery(piiRelationships []PIIRelationship) string {
 		         END
 		     }) as sharedAttributes
 		WHERE size(sharedAttributes) >= $minSharedAttributes
-		WITH c1, c2, sharedAttributes, size(sharedAttributes) as sharedAttributeCount
+		WITH e1, e2, sharedAttributes, size(sharedAttributes) as sharedAttributeCount
 		ORDER BY sharedAttributeCount DESC
 		LIMIT $limit
-		RETURN c1.customerId as customer1Id,
-		       c1.firstName as customer1FirstName,
-		       c1.lastName as customer1LastName,
-		       c2.customerId as customer2Id,
-		       c2.firstName as customer2FirstName,
-		       c2.lastName as customer2LastName,
+		RETURN %s,
+		       %s,
 		       sharedAttributes,
 		       sharedAttributeCount
-	`, relPattern, relPattern, caseStatement)
+	`, entityConfig.NodeLabel, relPattern, relPattern, entityConfig.NodeLabel,
+		caseStatement, returnClause1, returnClause2)
 
 	return query
+}
+
+// buildReturnClause builds the RETURN clause for entity properties
+func buildReturnClause(entityConfig EntityConfig, varName string) string {
+	// Always return the ID property
+	returnParts := []string{
+		fmt.Sprintf("%s.%s as %sId", varName, entityConfig.IdProperty, varName),
+	}
+
+	// Add display properties if specified
+	if len(entityConfig.DisplayProperties) > 0 {
+		for _, prop := range entityConfig.DisplayProperties {
+			// Skip if this property is the same as the ID property (already included)
+			if prop == entityConfig.IdProperty {
+				continue
+			}
+			alias := fmt.Sprintf("%s%s", varName, titleCase(prop))
+			returnParts = append(returnParts, fmt.Sprintf("%s.%s as %s", varName, prop, alias))
+		}
+	} else {
+		// If no display properties specified, return all properties as a map
+		returnParts = append(returnParts, fmt.Sprintf("properties(%s) as %sProperties", varName, varName))
+	}
+
+	return strings.Join(returnParts, ",\n               ")
+}
+
+// titleCase capitalizes the first letter of a string (replacement for deprecated strings.Title)
+func titleCase(s string) string {
+	if s == "" {
+		return s
+	}
+	return strings.ToUpper(s[:1]) + s[1:]
 }
 
 // buildQueryComponents builds common query components (relationship pattern and CASE statement)

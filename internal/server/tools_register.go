@@ -4,6 +4,7 @@ import (
 	"github.com/mark3labs/mcp-go/server"
 	"github.com/mkd-neo4j/neo4j-mcp-fraud/internal/tools"
 	"github.com/mkd-neo4j/neo4j-mcp-fraud/internal/tools/cypher"
+	"github.com/mkd-neo4j/neo4j-mcp-fraud/internal/tools/data/customer_profile"
 	"github.com/mkd-neo4j/neo4j-mcp-fraud/internal/tools/fraud/sar"
 	"github.com/mkd-neo4j/neo4j-mcp-fraud/internal/tools/fraud/synthetic_identity"
 	"github.com/mkd-neo4j/neo4j-mcp-fraud/internal/tools/gds"
@@ -31,6 +32,7 @@ const (
 	gdsCategory    toolCategory = 1
 	fraudCategory  toolCategory = 2
 	schemaCategory toolCategory = 3
+	dataCategory   toolCategory = 4 // Generic data retrieval tools
 )
 
 type ToolDefinition struct {
@@ -146,6 +148,15 @@ func (s *Neo4jMCPServer) getAllToolsDefs(deps *tools.ToolDependencies) []ToolDef
 			definition: server.ServerTool{
 				Tool:    schema.GetReferenceModelsSpec(),
 				Handler: schema.GetReferenceModelsHandler(deps),
+			},
+			readonly: true,
+		},
+		// Data Retrieval Category/Section - Generic tools for customer/transaction data
+		{
+			category: dataCategory,
+			definition: server.ServerTool{
+				Tool:    customer_profile.Spec(),
+				Handler: customer_profile.Handler(deps),
 			},
 			readonly: true,
 		},

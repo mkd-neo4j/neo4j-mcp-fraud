@@ -25,14 +25,14 @@ func TestDetectSyntheticIdentityHandler(t *testing.T) {
 		mockDB := db.NewMockService(ctrl)
 		mockDB.EXPECT().
 			ExecuteReadQuery(gomock.Any(), gomock.Any(), map[string]any{
-				"customerId":          "CUS123",
+				"entityId":            "CUS123",
 				"minSharedAttributes": 2,
 				"limit":               20,
 			}).
 			Return([]*neo4j.Record{}, nil)
 		mockDB.EXPECT().
 			Neo4jRecordsToJSON(gomock.Any()).
-			Return(`[{"customerId": "CUS456", "firstName": "Jane", "lastName": "Doe", "sharedAttributeCount": 2}]`, nil)
+			Return(`[{"otherId": "CUS456", "otherFirstName": "Jane", "otherLastName": "Doe", "sharedAttributeCount": 2}]`, nil)
 
 		deps := &tools.ToolDependencies{
 			DBService:        mockDB,
@@ -43,7 +43,12 @@ func TestDetectSyntheticIdentityHandler(t *testing.T) {
 		request := mcp.CallToolRequest{
 			Params: mcp.CallToolParams{
 				Arguments: map[string]any{
-					"customerId": "CUS123",
+					"entityId": "CUS123",
+					"entityConfig": map[string]any{
+						"nodeLabel":         "Customer",
+						"idProperty":        "customerId",
+						"displayProperties": []string{"firstName", "lastName"},
+					},
 					"piiRelationships": []map[string]any{
 						{
 							"relationshipType":   "HAS_EMAIL",
@@ -74,14 +79,14 @@ func TestDetectSyntheticIdentityHandler(t *testing.T) {
 		mockDB := db.NewMockService(ctrl)
 		mockDB.EXPECT().
 			ExecuteReadQuery(gomock.Any(), gomock.Any(), map[string]any{
-				"customerId":          "CUS123",
+				"entityId":            "CUS123",
 				"minSharedAttributes": 3,
 				"limit":               20,
 			}).
 			Return([]*neo4j.Record{}, nil)
 		mockDB.EXPECT().
 			Neo4jRecordsToJSON(gomock.Any()).
-			Return(`[{"customerId": "CUS789", "sharedAttributeCount": 3}]`, nil)
+			Return(`[{"otherId": "CUS789", "sharedAttributeCount": 3}]`, nil)
 
 		deps := &tools.ToolDependencies{
 			DBService:        mockDB,
@@ -92,8 +97,13 @@ func TestDetectSyntheticIdentityHandler(t *testing.T) {
 		request := mcp.CallToolRequest{
 			Params: mcp.CallToolParams{
 				Arguments: map[string]any{
-					"customerId":          "CUS123",
+					"entityId":            "CUS123",
 					"minSharedAttributes": 3,
+					"entityConfig": map[string]any{
+						"nodeLabel":         "Customer",
+						"idProperty":        "customerId",
+						"displayProperties": []string{"firstName", "lastName"},
+					},
 					"piiRelationships": []map[string]any{
 						{
 							"relationshipType":   "HAS_EMAIL",
@@ -125,7 +135,7 @@ func TestDetectSyntheticIdentityHandler(t *testing.T) {
 		}
 	})
 
-	t.Run("discovery mode without customerId", func(t *testing.T) {
+	t.Run("discovery mode without entityId", func(t *testing.T) {
 		mockDB := db.NewMockService(ctrl)
 		mockDB.EXPECT().
 			ExecuteReadQuery(gomock.Any(), gomock.Any(), map[string]any{
@@ -135,7 +145,7 @@ func TestDetectSyntheticIdentityHandler(t *testing.T) {
 			Return([]*neo4j.Record{}, nil)
 		mockDB.EXPECT().
 			Neo4jRecordsToJSON(gomock.Any()).
-			Return(`[{"customer1Id": "CUS123", "customer2Id": "CUS456", "sharedAttributeCount": 2}]`, nil)
+			Return(`[{"e1Id": "CUS123", "e2Id": "CUS456", "sharedAttributeCount": 2}]`, nil)
 
 		deps := &tools.ToolDependencies{
 			DBService:        mockDB,
@@ -146,6 +156,11 @@ func TestDetectSyntheticIdentityHandler(t *testing.T) {
 		request := mcp.CallToolRequest{
 			Params: mcp.CallToolParams{
 				Arguments: map[string]any{
+					"entityConfig": map[string]any{
+						"nodeLabel":         "Customer",
+						"idProperty":        "customerId",
+						"displayProperties": []string{"firstName", "lastName"},
+					},
 					"piiRelationships": []map[string]any{
 						{
 							"relationshipType":   "HAS_EMAIL",
@@ -179,7 +194,11 @@ func TestDetectSyntheticIdentityHandler(t *testing.T) {
 		request := mcp.CallToolRequest{
 			Params: mcp.CallToolParams{
 				Arguments: map[string]any{
-					"customerId":          "CUS123",
+					"entityId": "CUS123",
+					"entityConfig": map[string]any{
+						"nodeLabel":  "Customer",
+						"idProperty": "customerId",
+					},
 					"minSharedAttributes": 2,
 				},
 			},
@@ -278,7 +297,11 @@ func TestDetectSyntheticIdentityHandler(t *testing.T) {
 		request := mcp.CallToolRequest{
 			Params: mcp.CallToolParams{
 				Arguments: map[string]any{
-					"customerId": "CUS123",
+					"entityId": "CUS123",
+					"entityConfig": map[string]any{
+						"nodeLabel":  "Customer",
+						"idProperty": "customerId",
+					},
 					"piiRelationships": []map[string]any{
 						{
 							"relationshipType":   "HAS_EMAIL",
@@ -318,7 +341,11 @@ func TestDetectSyntheticIdentityHandler(t *testing.T) {
 		request := mcp.CallToolRequest{
 			Params: mcp.CallToolParams{
 				Arguments: map[string]any{
-					"customerId": "CUS123",
+					"entityId": "CUS123",
+					"entityConfig": map[string]any{
+						"nodeLabel":  "Customer",
+						"idProperty": "customerId",
+					},
 					"piiRelationships": []map[string]any{
 						{
 							"relationshipType":   "HAS_EMAIL",

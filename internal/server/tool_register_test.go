@@ -34,8 +34,8 @@ func TestToolRegister(t *testing.T) {
 
 		// Expected tools that should be registered
 		// update this number when a tool is added or removed.
-		// Current tools: get-schema, read-cypher, write-cypher, list-gds-procedures, detect-synthetic-identity, get-sar-report-guidance, get-neo4j-reference-data-models
-		expectedTotalToolsCount := 7
+		// Current tools: get-schema, read-cypher, write-cypher, list-gds-procedures, detect-synthetic-identity, get-sar-report-guidance, get-neo4j-reference-data-models, get-customer-profile
+		expectedTotalToolsCount := 8
 
 		// Start server and register tools
 		err := s.Start()
@@ -64,8 +64,8 @@ func TestToolRegister(t *testing.T) {
 
 		// Expected tools that should be registered
 		// update this number when a tool is added or removed.
-		// Readonly tools: get-schema, read-cypher, list-gds-procedures, detect-synthetic-identity, get-sar-report-guidance, get-neo4j-reference-data-models
-		expectedTotalToolsCount := 6
+		// Readonly tools: get-schema, read-cypher, list-gds-procedures, detect-synthetic-identity, get-sar-report-guidance, get-neo4j-reference-data-models, get-customer-profile
+		expectedTotalToolsCount := 7
 
 		// Start server and register tools
 		err := s.Start()
@@ -93,8 +93,8 @@ func TestToolRegister(t *testing.T) {
 
 		// Expected tools that should be registered
 		// update this number when a tool is added or removed.
-		// All tools: get-schema, read-cypher, write-cypher, list-gds-procedures, detect-synthetic-identity, get-sar-report-guidance, get-neo4j-reference-data-models
-		expectedTotalToolsCount := 7
+		// All tools: get-schema, read-cypher, write-cypher, list-gds-procedures, detect-synthetic-identity, get-sar-report-guidance, get-neo4j-reference-data-models, get-customer-profile
+		expectedTotalToolsCount := 8
 
 		// Start server and register tools
 		err := s.Start()
@@ -123,8 +123,8 @@ func TestToolRegister(t *testing.T) {
 
 		// Expected tools that should be registered
 		// update this number when a tool is added or removed.
-		// Non-GDS tools: get-schema, read-cypher, write-cypher, detect-synthetic-identity, get-sar-report-guidance, get-neo4j-reference-data-models
-		expectedTotalToolsCount := 6
+		// Non-GDS tools: get-schema, read-cypher, write-cypher, detect-synthetic-identity, get-sar-report-guidance, get-neo4j-reference-data-models, get-customer-profile
+		expectedTotalToolsCount := 7
 
 		// Start server and register tools
 		err := s.Start()
