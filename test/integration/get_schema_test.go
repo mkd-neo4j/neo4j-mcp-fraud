@@ -6,7 +6,7 @@ import (
 	"slices"
 	"testing"
 
-	"github.com/mkd-neo4j/neo4j-mcp-fraud/internal/tools/cypher"
+	"github.com/mkd-neo4j/neo4j-mcp-fraud/internal/tools/schema"
 	"github.com/mkd-neo4j/neo4j-mcp-fraud/test/integration/helpers"
 )
 
@@ -41,7 +41,7 @@ func TestGetSchema(t *testing.T) {
 		t.Fatalf("failed to seed Company node: %v", err)
 	}
 
-	getSchema := cypher.GetSchemaHandler(tc.Deps, 100)
+	getSchema := schema.GetSchemaHandler(tc.Deps, 100)
 	res := tc.CallTool(getSchema, nil)
 
 	var schemaEntries []SchemaItem

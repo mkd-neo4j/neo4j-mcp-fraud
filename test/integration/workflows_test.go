@@ -5,7 +5,8 @@ package integration
 import (
 	"testing"
 
-	"github.com/mkd-neo4j/neo4j-mcp-fraud/internal/tools/cypher"
+	"github.com/mkd-neo4j/neo4j-mcp-fraud/internal/tools/cypher/read"
+	"github.com/mkd-neo4j/neo4j-mcp-fraud/internal/tools/cypher/write"
 	"github.com/mkd-neo4j/neo4j-mcp-fraud/test/integration/helpers"
 )
 
@@ -15,14 +16,14 @@ func TestWriteThenRead(t *testing.T) {
 
 	companyLabel := tc.GetUniqueLabel("Company")
 
-	write := cypher.WriteCypherHandler(tc.Deps)
-	tc.CallTool(write, map[string]any{
+	writeHandler := write.WriteCypherHandler(tc.Deps)
+	tc.CallTool(writeHandler, map[string]any{
 		"query":  "CREATE (c:" + companyLabel + " {name: $name, industry: $industry}) RETURN c",
 		"params": map[string]any{"name": "Neo4j", "industry": "Database"},
 	})
 
-	read := cypher.ReadCypherHandler(tc.Deps)
-	res := tc.CallTool(read, map[string]any{
+	readHandler := read.ReadCypherHandler(tc.Deps)
+	res := tc.CallTool(readHandler, map[string]any{
 		"query":  "MATCH (c:" + companyLabel + ") RETURN c",
 		"params": map[string]any{},
 	})

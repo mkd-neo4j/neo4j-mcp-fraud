@@ -54,9 +54,10 @@ func NewNeo4jMCPServer(version string, cfg *config.Config, dbService database.Se
 			"Available tools: "+
 			"get-schema (returns your database schema with fraud detection context), "+
 			"get-neo4j-reference-data-models (returns Neo4j reference patterns for guidance on extending schemas), "+
-			"detect-synthetic-identity (finds customers sharing PII for fraud detection), "+
+			"detect-synthetic-identity (config-based tool - finds entities sharing PII for fraud detection), "+
 			"read-cypher and write-cypher (execute Cypher queries), "+
-			"list-gds-procedures (discover graph data science functions)."),
+			"list-gds-procedures (discover graph data science functions). "+
+			"Note: Some tools are dynamically loaded from YAML configs in tools/config/ directory."),
 	)
 
 	return &Neo4jMCPServer{

@@ -1,0 +1,724 @@
+name: generate-search-phrase
+title: Generate Neo4j Bloom Search Phrase
+description: |
+  # NEO4J BLOOM SEARCH PHRASE GENERATOR
+
+  Guides users through creating Search Phrases for Neo4j Bloom - saved queries that users can
+  invoke by typing in the search bar, with optional dynamic parameters.
+
+  ## WHAT ARE SEARCH PHRASES?
+
+  Search Phrases are saved, pre-defined queries in Bloom that:
+  - Start **fresh queries** (not dependent on current graph selection)
+  - Can be **static** (fixed query) or **dynamic** (with user-provided parameters)
+  - Are invoked by typing in the Bloom search bar
+  - Match case-insensitively (users can type partial phrases)
+  - Appear as autocomplete suggestions in search
+  - Support parameter suggestions from database or custom queries
+
+  **Key Difference from Scene Actions:**
+  - **Search Phrases**: Start new queries from user-typed input
+  - **Scene Actions**: Use currently selected graph elements as input
+
+  ---
+
+  ## WORKFLOW FOR CREATING SEARCH PHRASES
+
+  ### Step 1: Understand User Requirements
+  Ask the user to describe:
+  - **Goal**: What should this search phrase find?
+  - **Search phrase text**: What will users type? (natural language preferred)
+  - **Parameters**: Does it need dynamic inputs? What kind?
+  - **Output**: What should be returned? (nodes, paths, aggregations)
+  - **Suggestions**: Should parameters show suggestions? From where?
+
+  ### Step 2: Get Database Schema
+  **CRITICAL**: Always call `get-schema` first to understand:
+  - Available node labels
+  - Relationship types and directions
+  - Property names and data types
+  - Potential parameter suggestion sources
+
+  ### Step 3: Generate Test Query
+  Write a Cypher query:
+  - Use `$parameterName` for dynamic parameters
+  - Test with realistic parameter values
+  - Return paths or node sets (recommended by Bloom)
+
+  **Execute the query** using `read-cypher` to validate it works.
+
+  ### Step 4: User Validates Query
+  **IMPORTANT**: User must test the query with various parameter values and confirm
+  it works correctly before proceeding to Bloom formatting.
+
+  ### Step 5: Format as Search Phrase
+  Once validated, provide the Search Phrase configuration in Bloom-compatible format.
+
+  ---
+
+  ## SEARCH PHRASE TYPES
+
+  ### Type 1: Static Search Phrase
+
+  **Characteristics:**
+  - No parameters
+  - Fixed query
+  - User types phrase to execute
+  - Good for common queries
+
+  **Example: "Recent high-value transactions"**
+
+  ```cypher
+  MATCH (a:Account)-[t:TRANSACTION]->(dest:Account)
+  WHERE t.timestamp >= datetime() - duration('P7D')
+    AND t.amount > 10000
+  RETURN a, t, dest
+  ORDER BY t.timestamp DESC
+  LIMIT 50
+  ```
+
+  **User Experience:**
+  - User types: "Recent high" (autocomplete suggests full phrase)
+  - Query executes immediately when selected
+  - No parameter prompts
+
+  ---
+
+  ### Type 2: Dynamic Search Phrase with Parameters
+
+  **Characteristics:**
+  - Includes parameters marked with `$`
+  - User prompted to enter parameter values
+  - Supports parameter suggestions
+  - Flexible and reusable
+
+  **Example: "Customers from $country ordering $product"**
+
+  ```cypher
+  MATCH (c:Customer {country: $country})
+  MATCH (c)-[:PLACED]->(o:Order)-[:CONTAINS]->(p:Product {name: $product})
+  RETURN c, o, p
+  LIMIT 100
+  ```
+
+  **User Experience:**
+  - User types: "Customers from"
+  - Bloom prompts: "Enter country" (shows suggestions)
+  - User selects or types: "United States"
+  - Bloom prompts: "Enter product" (shows suggestions filtered by country)
+  - Query executes with user-provided values
+
+  ---
+
+  ## PARAMETER CONFIGURATION
+
+  ### Parameter Data Types
+
+  Supported types:
+  - `string` - Text values
+  - `integer` - Whole numbers
+  - `float` - Decimal numbers
+  - `boolean` - true/false
+  - `Date` - Date values (temporal)
+  - `Time` - Time values (temporal)
+  - `DateTime` - Date and time values (temporal)
+
+  ### Parameter Suggestion Modes
+
+  #### Mode 1: No Suggestions
+
+  User must type parameter value manually.
+
+  **Configuration:**
+  ```
+  Parameter: $customerId
+  Type: string
+  Suggestions: None
+  ```
+
+  **Use when:**
+  - Parameter values are unique identifiers
+  - Suggestion list would be too large
+  - Values are external to database
+
+  ---
+
+  #### Mode 2: Label-Key Suggestions
+
+  Suggestions pulled from node property values.
+
+  **Configuration:**
+  ```
+  Parameter: $country
+  Type: string
+  Suggestion Mode: Label-Key
+  Suggestion Source: Customer.country
+  ```
+
+  **Cypher equivalent:**
+  ```cypher
+  MATCH (c:Customer)
+  RETURN DISTINCT c.country AS country
+  ORDER BY country
+  ```
+
+  **Use when:**
+  - Parameter values exist as properties on nodes
+  - Simple, single-property suggestions
+  - Fast lookup needed
+
+  ---
+
+  #### Mode 3: Custom Cypher Query Suggestions
+
+  Suggestions from custom query results.
+
+  **Configuration:**
+  ```
+  Parameter: $productName
+  Type: string
+  Suggestion Mode: Custom Query
+  Suggestion Query:
+    MATCH (p:Product)
+    WHERE p.inStock = true
+    RETURN p.name AS productName, p.category AS category
+    ORDER BY p.name
+  ```
+
+  **Use when:**
+  - Need filtered or computed suggestions
+  - Suggestions require joins or calculations
+  - Want to show additional context (category, description)
+
+  ---
+
+  ### Parameter Chaining (Dependent Parameters)
+
+  Later parameters can filter suggestions based on earlier parameter values.
+
+  **Example: "Orders from $country for $category"**
+
+  **Parameter 1: $country**
+  ```
+  Suggestion Query:
+  MATCH (c:Customer)
+  RETURN DISTINCT c.country AS country
+  ORDER BY country
+  ```
+
+  **Parameter 2: $category (depends on $country)**
+  ```
+  Suggestion Query:
+  MATCH (c:Customer {country: $country})
+  MATCH (c)-[:PLACED]->(o:Order)-[:CONTAINS]->(p:Product)
+  RETURN DISTINCT p.category AS category
+  ORDER BY category
+  ```
+
+  **User Experience:**
+  - User selects country: "United States"
+  - Category suggestions show only categories ordered by US customers
+  - Dynamic filtering improves relevance
+
+  ---
+
+  ## COMMON SEARCH PHRASE PATTERNS
+
+  ### Pattern 1: Find by Single Property
+
+  **Use Case**: "Customer with email $email"
+
+  ```cypher
+  MATCH (c:Customer)-[:HAS_EMAIL]->(e:Email {address: $email})
+  RETURN c, e
+  ```
+
+  **Parameters:**
+  - `$email` (string, no suggestions)
+
+  ---
+
+  ### Pattern 2: Find by Multiple Properties
+
+  **Use Case**: "Customers from $country with occupation $occupation"
+
+  ```cypher
+  MATCH (c:Customer {nationality: $country})
+  MATCH (c)-[:HAS_EMPLOYMENT]->(emp:Employment {occupation: $occupation})
+  RETURN c, emp
+  LIMIT 50
+  ```
+
+  **Parameters:**
+  - `$country` (string, Label-Key: Customer.nationality)
+  - `$occupation` (string, Label-Key: Employment.occupation, filtered by $country)
+
+  ---
+
+  ### Pattern 3: Date Range Query
+
+  **Use Case**: "Transactions between $startDate and $endDate"
+
+  ```cypher
+  MATCH (a:Account)-[t:TRANSACTION]->(dest:Account)
+  WHERE t.timestamp >= datetime($startDate)
+    AND t.timestamp <= datetime($endDate)
+  RETURN a, t, dest
+  ORDER BY t.timestamp DESC
+  LIMIT 100
+  ```
+
+  **Parameters:**
+  - `$startDate` (DateTime, no suggestions)
+  - `$endDate` (DateTime, no suggestions)
+
+  **Note**: User enters dates in ISO 8601 format: `2024-01-01T00:00:00Z`
+
+  ---
+
+  ### Pattern 4: Threshold-Based Query
+
+  **Use Case**: "Transactions over $amount"
+
+  ```cypher
+  MATCH (a:Account)-[t:TRANSACTION]->(dest:Account)
+  WHERE t.amount >= $amount
+  RETURN a, t, dest
+  ORDER BY t.amount DESC
+  LIMIT 50
+  ```
+
+  **Parameters:**
+  - `$amount` (float, no suggestions)
+
+  ---
+
+  ### Pattern 5: Path Finding
+
+  **Use Case**: "Connection between $customer1 and $customer2"
+
+  ```cypher
+  MATCH (c1:Customer {customerId: $customer1})
+  MATCH (c2:Customer {customerId: $customer2})
+  MATCH path = shortestPath((c1)-[*..5]-(c2))
+  RETURN path
+  ```
+
+  **Parameters:**
+  - `$customer1` (string, Custom Query: list all customers)
+  - `$customer2` (string, Custom Query: list all customers except $customer1)
+
+  **Suggestion Query for $customer1:**
+  ```cypher
+  MATCH (c:Customer)
+  RETURN c.customerId AS customerId, c.firstName + ' ' + c.lastName AS name
+  ORDER BY name
+  ```
+
+  **Suggestion Query for $customer2:**
+  ```cypher
+  MATCH (c:Customer)
+  WHERE c.customerId <> $customer1
+  RETURN c.customerId AS customerId, c.firstName + ' ' + c.lastName AS name
+  ORDER BY name
+  ```
+
+  ---
+
+  ### Pattern 6: Fraud Detection - Velocity Analysis
+
+  **Use Case**: "Customers with more than $count transactions in last $days days"
+
+  ```cypher
+  MATCH (c:Customer)-[:OWNS]->(a:Account)
+  MATCH (a)-[t:TRANSACTION]->()
+  WHERE t.timestamp >= datetime() - duration('P' + $days + 'D')
+  WITH c, count(t) AS txCount
+  WHERE txCount > $count
+  MATCH (c)-[:OWNS]->(a2:Account)
+  RETURN c, a2
+  LIMIT 50
+  ```
+
+  **Parameters:**
+  - `$count` (integer, no suggestions)
+  - `$days` (integer, no suggestions)
+
+  ---
+
+  ### Pattern 7: Fraud Detection - Shared Identity
+
+  **Use Case**: "Customers sharing $attributeType with customer $customerId"
+
+  ```cypher
+  MATCH (suspect:Customer {customerId: $customerId})
+  MATCH (suspect)-[r]->(pii)
+  WHERE type(r) = 'HAS_' + toUpper($attributeType)
+  MATCH (other:Customer)-[r2]->(pii)
+  WHERE type(r2) = type(r) AND suspect <> other
+  RETURN suspect, pii, other
+  LIMIT 50
+  ```
+
+  **Parameters:**
+  - `$customerId` (string, Custom Query: list customers)
+  - `$attributeType` (string, Custom Query: ['EMAIL', 'PHONE', 'SSN', 'ADDRESS'])
+
+  **Alternative (simpler, predefined attributes):**
+  ```cypher
+  MATCH (suspect:Customer {customerId: $customerId})
+  MATCH (suspect)-[:HAS_EMAIL|HAS_PHONE|HAS_SSN]->(pii)
+  MATCH (other:Customer)-[:HAS_EMAIL|HAS_PHONE|HAS_SSN]->(pii)
+  WHERE suspect <> other
+  RETURN suspect, pii, other
+  LIMIT 50
+  ```
+
+  ---
+
+  ## BLOOM SEARCH PHRASE CONFIGURATION
+
+  Once the Cypher query is validated, provide this information:
+
+  ### Configuration Elements
+
+  1. **Search Phrase Text**: Natural language phrase with `$parameters`
+     - Use clear, conversational language
+     - Mark parameters with `$` prefix
+     - Examples:
+       - "Customer with email $email"
+       - "Transactions from $country over $amount"
+       - "High-risk customers from $startDate to $endDate"
+
+  2. **Cypher Query**: The validated query
+     - Must use same `$parameter` names as phrase
+     - Should include LIMIT clauses
+     - Return paths or node sets (recommended)
+
+  3. **Parameters** (if dynamic):
+     - Parameter name (must match `$name` in phrase and query)
+     - Data type (string, integer, float, boolean, Date, Time, DateTime)
+     - Suggestion mode (None, Label-Key, Custom Query)
+     - Suggestion query (if Custom Query mode)
+
+  4. **Description**: Brief explanation
+     - What does this search phrase find?
+     - When should users use it?
+
+  5. **Transaction Type**:
+     - **READ**: For queries that only read data (most common)
+     - **WRITE**: For queries that modify data (rare, requires caution)
+
+  ### Example Configuration
+
+  ```
+  Search Phrase Configuration:
+
+  Phrase Text: "Customers from $country with transactions over $amount"
+
+  Description: "Finds customers from a specific country who have made transactions
+  exceeding a specified amount threshold. Useful for AML monitoring and high-value
+  customer analysis."
+
+  Cypher Query:
+  MATCH (c:Customer {nationality: $country})
+  MATCH (c)-[:OWNS]->(a:Account)
+  MATCH (a)-[t:TRANSACTION]->()
+  WHERE t.amount > $amount
+  WITH c, a, count(DISTINCT t) AS txCount, sum(t.amount) AS totalAmount
+  WHERE txCount > 0
+  RETURN c, a
+  ORDER BY totalAmount DESC
+  LIMIT 50
+
+  Parameters:
+
+  1. $country
+     Type: string
+     Suggestion Mode: Label-Key
+     Suggestion Source: Customer.nationality
+
+  2. $amount
+     Type: float
+     Suggestion Mode: None
+     (User types amount manually)
+
+  Transaction Type: READ
+
+  Result Limit: 50 customers
+  ```
+
+  ---
+
+  ## IMPORTING INTO BLOOM
+
+  ### Method 1: Bloom UI (Recommended)
+
+  1. Open Neo4j Bloom
+  2. Open the Perspective drawer (left sidebar)
+  3. Navigate to "Search Phrases" section
+  4. Click "Add Search Phrase"
+  5. Enter the configuration:
+     - **Search phrase text**: Include `$parameters` in phrase
+     - **Description**: Brief explanation
+     - **Cypher query**: Validated query
+     - **Parameters** (if dynamic):
+       - Click "Add Parameter" for each
+       - Configure name, type, suggestion mode
+  6. Save the search phrase
+
+  ### Method 2: Perspective JSON Export/Import
+
+  For bulk management or sharing:
+
+  1. Export current perspective: Perspective settings → Export
+  2. Edit the JSON file to add search phrase under `"searchPhrases"` array
+  3. Import updated perspective: Perspective settings → Import
+
+  **JSON Structure (Static Search Phrase):**
+  ```json
+  {
+    "perspective": {
+      "searchPhrases": [
+        {
+          "phrase": "Recent high-value transactions",
+          "description": "Transactions over $10,000 in the last 7 days",
+          "cypher": "MATCH (a:Account)-[t:TRANSACTION]->(dest:Account)\nWHERE t.timestamp >= datetime() - duration('P7D')\n  AND t.amount > 10000\nRETURN a, t, dest\nORDER BY t.timestamp DESC\nLIMIT 50",
+          "parameters": [],
+          "transactionType": "READ"
+        }
+      ]
+    }
+  }
+  ```
+
+  **JSON Structure (Dynamic Search Phrase):**
+  ```json
+  {
+    "perspective": {
+      "searchPhrases": [
+        {
+          "phrase": "Customers from $country with transactions over $amount",
+          "description": "Find customers by country and transaction amount",
+          "cypher": "MATCH (c:Customer {nationality: $country})\nMATCH (c)-[:OWNS]->(a:Account)\nMATCH (a)-[t:TRANSACTION]->()\nWHERE t.amount > $amount\nRETURN c, a\nLIMIT 50",
+          "parameters": [
+            {
+              "name": "country",
+              "type": "string",
+              "suggestionMode": "labelKey",
+              "suggestionSource": {
+                "label": "Customer",
+                "key": "nationality"
+              }
+            },
+            {
+              "name": "amount",
+              "type": "float",
+              "suggestionMode": "none"
+            }
+          ],
+          "transactionType": "READ"
+        }
+      ]
+    }
+  }
+  ```
+
+  ---
+
+  ## BEST PRACTICES
+
+  ### Query Design
+
+  1. **Return paths or node sets** (Bloom recommendation)
+     ```cypher
+     // Good: Returns nodes and relationships for visualization
+     RETURN a, t, dest
+
+     // Good: Returns path for visualization
+     RETURN path
+
+     // Avoid: Returns only relationships (Bloom can't visualize well)
+     RETURN t
+
+     // Acceptable: Returns property values (non-visual)
+     RETURN c.name, sum(t.amount)
+     ```
+
+  2. **Include LIMIT clauses**: Prevent overwhelming results
+     ```cypher
+     LIMIT 50  // or 100, depending on use case
+     ```
+
+  3. **Order results meaningfully**:
+     ```cypher
+     ORDER BY t.timestamp DESC  // Most recent first
+     ORDER BY t.amount DESC     // Highest value first
+     ORDER BY c.name ASC        // Alphabetical
+     ```
+
+  4. **Handle missing data gracefully**:
+     ```cypher
+     OPTIONAL MATCH (c)-[:HAS_EMAIL]->(e:Email)
+     // c will be returned even if no email exists
+     ```
+
+  ### Parameter Design
+
+  1. **Use natural language** in phrase text:
+     - Good: "Customers from $country"
+     - Avoid: "CUST_BY_COUNTRY $countryCode"
+
+  2. **Provide parameter suggestions** when possible:
+     - Improves user experience
+     - Reduces typos and errors
+     - Guides users to valid values
+
+  3. **Chain parameters** for filtering:
+     - Later parameters filter based on earlier selections
+     - Improves suggestion relevance
+
+  4. **Limit suggestion results**:
+     ```cypher
+     // In suggestion query
+     RETURN DISTINCT c.country AS country
+     ORDER BY country
+     LIMIT 100  // Don't overwhelm dropdown
+     ```
+
+  ### Performance
+
+  1. **Index critical properties**:
+     - Properties used in WHERE clauses
+     - Properties used for suggestions
+     - Ensures fast query execution
+
+  2. **Test with realistic data volumes**:
+     - Test with small, medium, large datasets
+     - Verify performance is acceptable
+
+  3. **Consider result limits**:
+     - 50-100 results is reasonable for visualization
+     - Larger result sets may cause Bloom performance issues
+
+  ---
+
+  ## TROUBLESHOOTING
+
+  ### Issue: Search Phrase Not Appearing in Autocomplete
+
+  **Solutions:**
+  - Verify phrase is saved in current perspective
+  - Refresh Bloom perspective
+  - Check for typos in phrase text
+  - Ensure perspective is activated
+
+  ### Issue: Parameter Suggestions Not Loading
+
+  **Solutions:**
+  - Verify suggestion query syntax is correct
+  - Test suggestion query independently using `read-cypher`
+  - Check database has data for suggestion source
+  - Ensure property names match schema
+
+  ### Issue: Query Returns No Results
+
+  **Solutions:**
+  - Test query with known good parameter values
+  - Check database has matching data
+  - Verify parameter data types are correct
+  - Review WHERE clause conditions
+
+  ### Issue: Query Too Slow
+
+  **Solutions:**
+  - Add indexes on filtered properties
+  - Add LIMIT clause to cap results
+  - Simplify complex path queries
+  - Review query execution plan
+
+  ### Issue: WRITE Search Phrase Not Available
+
+  **Solutions:**
+  - Verify Bloom supports write operations
+  - Enable WRITE transactions in Bloom settings
+  - Confirm user has write permissions
+  - Consider if write operation is appropriate for search phrase
+
+  ---
+
+  ## COMPARISON: SEARCH PHRASES VS SCENE ACTIONS
+
+  | Feature | Search Phrases | Scene Actions |
+  |---------|---------------|---------------|
+  | **Invocation** | Type in search bar | Right-click context menu |
+  | **Input** | User-typed parameters | Selected graph elements |
+  | **Use case** | Start new investigation | Expand/analyze current selection |
+  | **Parameters** | `$userParameter` | `$nodes` or `$relationships` |
+  | **Suggestions** | Configurable per parameter | N/A (uses selection) |
+  | **When to use** | Finding initial entities | Exploring from known entities |
+
+  **Decision Guide:**
+  - Use **Search Phrase** when: Users need to find entities from scratch
+  - Use **Scene Action** when: Users already have entities selected and want to expand/analyze
+
+  ---
+
+  ## ADDITIONAL RESOURCES
+
+  - **Neo4j Bloom Search Phrases Documentation**: https://neo4j.com/docs/bloom-user-guide/current/bloom-tutorial/search-phrases-advanced/
+  - **Cypher Query Language Reference**: https://neo4j.com/docs/cypher-manual/current/
+  - **Neo4j Bloom User Guide**: https://neo4j.com/docs/bloom-user-guide/current/
+
+  ---
+
+  ## CONVERSATION FLOW EXAMPLE
+
+  **User**: "I want to create a search phrase to find customers from a specific country who have made transactions over a certain amount."
+
+  **Assistant**:
+  1. Calls `get-schema` to understand Customer, Account, Transaction structure
+  2. Proposes search phrase text: "Customers from $country with transactions over $amount"
+  3. Generates test query:
+     ```cypher
+     MATCH (c:Customer {nationality: $country})
+     MATCH (c)-[:OWNS]->(a:Account)
+     MATCH (a)-[t:TRANSACTION]->()
+     WHERE t.amount > $amount
+     WITH c, a, count(DISTINCT t) AS txCount
+     WHERE txCount > 0
+     RETURN c, a
+     ORDER BY c.customerId
+     LIMIT 50
+     ```
+  4. Tests query with sample values: `$country = "United States"`, `$amount = 10000`
+  5. Asks user to validate results
+  6. Once validated, provides Search Phrase configuration:
+     - Phrase: "Customers from $country with transactions over $amount"
+     - Description: "Find customers by country and transaction threshold"
+     - Parameters:
+       - `$country` (string, Label-Key: Customer.nationality)
+       - `$amount` (float, no suggestions)
+     - Transaction Type: READ
+  7. Provides import instructions for Bloom UI
+
+  ---
+
+  **IMPORTANT REMINDERS:**
+
+  - ✅ Always call `get-schema` first to understand database structure
+  - ✅ Generate and test Cypher query BEFORE formatting as search phrase
+  - ✅ User must validate query works with their data
+  - ✅ Use natural language for phrase text
+  - ✅ Mark parameters with `$` prefix
+  - ✅ Configure parameter suggestions when possible
+  - ✅ Return paths or node sets (Bloom recommendation)
+  - ✅ Include LIMIT clauses for performance
+  - ✅ Test with realistic data volumes
+  - ✅ Provide clear import instructions for Bloom UI
+
+metadata:
+  readonly: true
+  idempotent: true
+  destructive: false
+  category: bloom

@@ -1,13 +1,15 @@
 package server
 
 import (
+	"log/slog"
+
 	"github.com/mark3labs/mcp-go/server"
 	"github.com/mkd-neo4j/neo4j-mcp-fraud/internal/tools"
-	"github.com/mkd-neo4j/neo4j-mcp-fraud/internal/tools/cypher"
-	"github.com/mkd-neo4j/neo4j-mcp-fraud/internal/tools/data/customer_profile"
-	"github.com/mkd-neo4j/neo4j-mcp-fraud/internal/tools/fraud/sar"
-	"github.com/mkd-neo4j/neo4j-mcp-fraud/internal/tools/fraud/synthetic_identity"
+	"github.com/mkd-neo4j/neo4j-mcp-fraud/internal/tools/cypher/read"
+	"github.com/mkd-neo4j/neo4j-mcp-fraud/internal/tools/cypher/write"
+	"github.com/mkd-neo4j/neo4j-mcp-fraud/internal/tools/dynamic"
 	"github.com/mkd-neo4j/neo4j-mcp-fraud/internal/tools/gds"
+	"github.com/mkd-neo4j/neo4j-mcp-fraud/internal/tools/models"
 	"github.com/mkd-neo4j/neo4j-mcp-fraud/internal/tools/schema"
 )
 
@@ -28,11 +30,12 @@ type toolFilter func(tools []ToolDefinition) []ToolDefinition
 type toolCategory int
 
 const (
-	cypherCategory toolCategory = 0
-	gdsCategory    toolCategory = 1
-	fraudCategory  toolCategory = 2
-	schemaCategory toolCategory = 3
-	dataCategory   toolCategory = 4 // Generic data retrieval tools
+	cypherCategory  toolCategory = 0
+	gdsCategory     toolCategory = 1
+	fraudCategory   toolCategory = 2
+	schemaCategory  toolCategory = 3
+	dataCategory    toolCategory = 4 // Generic data retrieval tools
+	dynamicCategory toolCategory = 5 // Dynamic config-based tools
 )
 
 type ToolDefinition struct {
@@ -90,29 +93,28 @@ func filterGDSTools(tools []ToolDefinition) []ToolDefinition {
 
 // getAllToolsDefs returns all available tools with their specs and handlers
 func (s *Neo4jMCPServer) getAllToolsDefs(deps *tools.ToolDependencies) []ToolDefinition {
-
-	return []ToolDefinition{
+	toolDefs := []ToolDefinition{
 		{
-			category: cypherCategory,
+			category: schemaCategory,
 			definition: server.ServerTool{
-				Tool:    cypher.GetSchemaSpec(),
-				Handler: cypher.GetSchemaHandler(deps, s.config.SchemaSampleSize),
+				Tool:    schema.GetSchemaSpec(),
+				Handler: schema.GetSchemaHandler(deps, s.config.SchemaSampleSize),
 			},
 			readonly: true,
 		},
 		{
 			category: cypherCategory,
 			definition: server.ServerTool{
-				Tool:    cypher.ReadCypherSpec(),
-				Handler: cypher.ReadCypherHandler(deps),
+				Tool:    read.ReadCypherSpec(),
+				Handler: read.ReadCypherHandler(deps),
 			},
 			readonly: true,
 		},
 		{
 			category: cypherCategory,
 			definition: server.ServerTool{
-				Tool:    cypher.WriteCypherSpec(),
-				Handler: cypher.WriteCypherHandler(deps),
+				Tool:    write.WriteCypherSpec(),
+				Handler: write.WriteCypherHandler(deps),
 			},
 			readonly: false,
 		},
@@ -125,41 +127,55 @@ func (s *Neo4jMCPServer) getAllToolsDefs(deps *tools.ToolDependencies) []ToolDef
 			},
 			readonly: true,
 		},
-		// Fraud Detection Category/Section
-		{
-			category: fraudCategory,
-			definition: server.ServerTool{
-				Tool:    synthetic_identity.Spec(),
-				Handler: synthetic_identity.Handler(deps),
-			},
-			readonly: true,
-		},
-		{
-			category: fraudCategory,
-			definition: server.ServerTool{
-				Tool:    sar.GetSARGuidanceSpec(),
-				Handler: sar.GetSARGuidanceHandler(deps),
-			},
-			readonly: true,
-		},
-		// Schema Tools Category/Section
+		// Data Models Category/Section
 		{
 			category: schemaCategory,
 			definition: server.ServerTool{
-				Tool:    schema.GetReferenceModelsSpec(),
-				Handler: schema.GetReferenceModelsHandler(deps),
+				Tool:    models.GetReferenceModelsSpec(),
+				Handler: models.GetReferenceModelsHandler(deps),
 			},
 			readonly: true,
 		},
-		// Data Retrieval Category/Section - Generic tools for customer/transaction data
-		{
-			category: dataCategory,
-			definition: server.ServerTool{
-				Tool:    customer_profile.Spec(),
-				Handler: customer_profile.Handler(deps),
-			},
-			readonly: true,
-		},
-		// Add other categories below...
+		// Note: Data retrieval tools (get-customer-profile) are now config-based in tools/config/data/
 	}
+
+	// Load dynamic tools from config directory
+	dynamicTools := s.loadDynamicTools(deps)
+	toolDefs = append(toolDefs, dynamicTools...)
+
+	return toolDefs
+}
+
+// loadDynamicTools loads tools from YAML configs in tools/config/ directory
+func (s *Neo4jMCPServer) loadDynamicTools(deps *tools.ToolDependencies) []ToolDefinition {
+	registry := dynamic.NewToolRegistry("tools/config")
+
+	if err := registry.LoadTools(); err != nil {
+		slog.Error("failed to load dynamic tools", "error", err)
+		return []ToolDefinition{}
+	}
+
+	if registry.GetToolCount() == 0 {
+		slog.Info("no dynamic tools found in config directory")
+		return []ToolDefinition{}
+	}
+
+	slog.Info("loaded dynamic tools", "count", registry.GetToolCount())
+
+	// Convert dynamic tools to ToolDefinition format
+	serverTools := registry.GetServerTools(deps)
+	toolDefs := make([]ToolDefinition, 0, len(serverTools))
+
+	for _, serverTool := range serverTools {
+		// All dynamic tools are categorized as dynamicCategory
+		// Their specific category (fraud, data, etc.) is stored in metadata
+		toolDef := ToolDefinition{
+			category:   dynamicCategory,
+			definition: serverTool,
+			readonly:   true, // Dynamic tools specify readonly in their config
+		}
+		toolDefs = append(toolDefs, toolDef)
+	}
+
+	return toolDefs
 }

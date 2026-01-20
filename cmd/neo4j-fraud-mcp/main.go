@@ -13,6 +13,8 @@ import (
 	"github.com/mkd-neo4j/neo4j-mcp-fraud/internal/database"
 	"github.com/mkd-neo4j/neo4j-mcp-fraud/internal/logger"
 	"github.com/mkd-neo4j/neo4j-mcp-fraud/internal/server"
+	"github.com/mkd-neo4j/neo4j-mcp-fraud/internal/tools/dynamic"
+	"github.com/mkd-neo4j/neo4j-mcp-fraud/tools"
 	"github.com/neo4j/neo4j-go-driver/v5/neo4j"
 )
 
@@ -23,6 +25,9 @@ const MixPanelEndpoint = "https://api.mixpanel.com"
 const MixPanelToken = "4bfb2414ab973c741b6f067bf06d5575" // #nosec G101 -- MixPanel tokens are safe to be public
 
 func main() {
+	// Initialize embedded configuration files for dynamic tools
+	dynamic.EmbeddedFS = tools.ConfigFiles
+
 	// Handle CLI arguments (version, help, etc.)
 	cli.HandleArgs(Version)
 

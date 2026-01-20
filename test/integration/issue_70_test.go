@@ -9,7 +9,8 @@ import (
 
 	"github.com/mark3labs/mcp-go/mcp"
 	"github.com/mkd-neo4j/neo4j-mcp-fraud/internal/tools"
-	"github.com/mkd-neo4j/neo4j-mcp-fraud/internal/tools/cypher"
+	"github.com/mkd-neo4j/neo4j-mcp-fraud/internal/tools/cypher/read"
+	"github.com/mkd-neo4j/neo4j-mcp-fraud/internal/tools/cypher/write"
 	"github.com/mkd-neo4j/neo4j-mcp-fraud/test/integration/helpers"
 )
 
@@ -23,11 +24,11 @@ func TestIssue70(t *testing.T) {
 	}{
 		{
 			name:    "read-cypher",
-			handler: cypher.ReadCypherHandler,
+			handler: read.ReadCypherHandler,
 		},
 		{
 			name:    "write-cypher",
-			handler: cypher.WriteCypherHandler,
+			handler: write.WriteCypherHandler,
 		},
 	}
 

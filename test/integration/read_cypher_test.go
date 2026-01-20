@@ -6,7 +6,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/mkd-neo4j/neo4j-mcp-fraud/internal/tools/cypher"
+	"github.com/mkd-neo4j/neo4j-mcp-fraud/internal/tools/cypher/read"
 	"github.com/mkd-neo4j/neo4j-mcp-fraud/test/integration/helpers"
 )
 
@@ -20,7 +20,7 @@ func TestReadCypher(t *testing.T) {
 			t.Fatalf("failed to seed data: %v", err)
 		}
 
-		read := cypher.ReadCypherHandler(tc.Deps)
+		read := read.ReadCypherHandler(tc.Deps)
 		res := tc.CallTool(read, map[string]any{
 			"query":  "MATCH (p:" + personLabel + " {name: $name}) RETURN p",
 			"params": map[string]any{"name": "Alice"},
@@ -47,7 +47,7 @@ func TestReadCypher(t *testing.T) {
 
 		personLabel := tc.GetUniqueLabel("Person")
 
-		read := cypher.ReadCypherHandler(tc.Deps)
+		read := read.ReadCypherHandler(tc.Deps)
 		textError := tc.GetToolError(read, map[string]any{
 			"query":  "CREATE (p:" + personLabel + ") SET p.name = $name RETURN p",
 			"params": map[string]any{"name": "Alice"},
