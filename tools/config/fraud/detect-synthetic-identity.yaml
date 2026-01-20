@@ -69,30 +69,6 @@ description: |
   - Return entity display properties (customerId, firstName, lastName, etc.)
   - Consider using WCC algorithm for large-scale community detection of fraud rings
 
-input_schema:
-  type: object
-  required:
-    - query
-  properties:
-    query:
-      type: string
-      description: Your Cypher query to detect synthetic identity fraud (based on the patterns above)
-    params:
-      type: object
-      description: Optional query parameters
-      properties:
-        entityId:
-          type: string
-          description: Optional - Specific entity ID to investigate (omit for discovery mode)
-        minSharedAttributes:
-          type: integer
-          description: Minimum number of shared attributes to flag as suspicious
-          default: 2
-        limit:
-          type: integer
-          description: Maximum number of results to return
-          default: 20
-
 execution:
   mode: read
   timeout: 30000

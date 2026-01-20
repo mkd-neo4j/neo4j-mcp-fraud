@@ -254,22 +254,6 @@ description: |
   - For business customers, prioritize entity_details section for corporate KYC
   - Address classification with temporal context (current/previous/business) aids compliance and investigation
 
-input_schema:
-  type: object
-  required:
-    - query
-  properties:
-    query:
-      type: string
-      description: Your Cypher query to retrieve customer profile (adapt the example above to your schema)
-    params:
-      type: object
-      description: Query parameters
-      properties:
-        customerId:
-          type: string
-          description: Customer ID to retrieve (required)
-
 execution:
   mode: read
   timeout: 30000
