@@ -1,15 +1,14 @@
 # Neo4j Fraud MCP
 
-Official Model Context Protocol (MCP) server for Neo4j, specialized for fraud detection and financial crime investigation.
+Model Context Protocol (MCP) server for Neo4j, specialized for fraud detection and financial crime investigation.
 
-## Links
+## Why Neo4j Fraud MCP?
 
-- [Documentation](https://neo4j.com/docs/fraud-mcp/current/)
-- [Discord](https://discord.gg/neo4j)
+The Neo4j Fraud MCP server is purpose-built for financial crime analysts, AML investigators, and compliance officers. It combines Neo4j's powerful graph database capabilities with specialized fraud detection tools to:
 
-## Overview
-
-The Neo4j Fraud MCP server is purpose-built for financial crime analysts, AML investigators, and compliance officers. It combines Neo4j's powerful graph database capabilities with specialized fraud detection tools to accelerate investigations, lower the barrier to entry for analysts who may not be Cypher experts, and leverage Neo4j's strengths in pattern matching, deep traversals, and relationship analysis.
+- **Accelerate investigations** through natural language queries to complex graph patterns
+- **Lower the barrier to entry** for analysts who may not be Cypher experts
+- **Leverage Neo4j's strengths** in pattern matching, deep traversals, and relationship analysis
 
 ### Target Users
 
@@ -27,156 +26,58 @@ The Neo4j Fraud MCP server is purpose-built for financial crime analysts, AML in
 5. **Risk Assessment**: Evaluating exposure to high-risk jurisdictions and entities
 6. **Synthetic Identity Detection**: Identifying fraudulent identity patterns and suspicious account behavior
 
-## Prerequisites
+## Quick Start
 
-- A running Neo4j database instance; options include [Aura](https://neo4j.com/product/auradb/), [neo4j–desktop](https://neo4j.com/download/) or [self-managed](https://neo4j.com/deployment-center/#gdb-tab).
-- APOC plugin installed in the Neo4j instance.
-- Any MCP-compatible client (e.g. [VSCode](https://code.visualstudio.com/) with [MCP support](https://code.visualstudio.com/docs/copilot/customization/mcp-servers))
+📦 **Installation & Setup**: See [SETUP.md](SETUP.md) for complete installation and configuration instructions
 
-## Startup Checks & Adaptive Operation
+## Architecture: YAML-Based Dynamic Tools
 
-The server performs several pre-flight checks at startup to ensure your environment is correctly configured.
+The Neo4j Fraud MCP server uses a **config-based architecture** where most tools are defined as YAML files rather than hardcoded Go implementations. This design provides:
 
-**STDIO Mode - Mandatory Requirements**
-In STDIO mode, the server verifies the following core requirements. If any of these checks fail (e.g., due to an invalid configuration, incorrect credentials, or a missing APOC installation), the server will not start:
+- ✅ **Easy extensibility**: Add new tools by creating YAML files—no Go code changes required
+- ✅ **LLM-optimized**: Tool descriptions are embedded in config, providing detailed guidance for AI agents
+- ✅ **Clear categorization**: Tools are organized by folder structure (fraud/, bloom/, sar/, graph-data/)
+- ✅ **Zero-code customization**: Modify tool behavior, thresholds, and guidance without rebuilding
 
-- A valid connection to your Neo4j instance.
-- The ability to execute queries.
-- The presence of the APOC plugin.
+### Tool Discovery
 
-**HTTP Mode - Verification Skipped**
-In HTTP mode, startup verification checks are skipped because credentials come from per-request Basic Auth headers. The server starts immediately without connecting to Neo4j at startup.
+At startup, the server automatically:
+1. Scans the `tools/config/` directory (embedded in binary)
+2. Loads all `*.yaml` tool definitions
+3. Registers them as MCP tools with their specifications
 
-**Optional Requirements**
-If an optional dependency is missing, the server will start in an adaptive mode. For instance, if the Graph Data Science (GDS) library is not detected in your Neo4j installation, the server will still launch but will automatically disable all GDS-related tools, such as `list-gds-procedures`. All other tools will remain available.
+**Example YAML tool structure:**
+```yaml
+name: detect-synthetic-identity
+title: Detect Synthetic Identity Fraud
+description: |
+  Detailed guidance for LLMs on how to detect fraud patterns...
 
-## Installation (Binary)
+input_schema:
+  type: object
+  properties:
+    query:
+      type: string
+      description: Your Cypher query to detect synthetic identity fraud
 
-Releases: https://github.com/mkd-neo4j/neo4j-mcp-fraud/releases
+execution:
+  mode: read  # or 'write'
+  timeout: 30000
 
-1. Download the archive for your OS/arch.
-2. Extract and place `neo4j-fraud-mcp` in a directory present in your PATH variables (see examples below).
-
-Mac / Linux:
-
-```bash
-chmod +x neo4j-fraud-mcp
-sudo mv neo4j-fraud-mcp /usr/local/bin/
+metadata:
+  readonly: true
+  category: fraud  # derived from folder: tools/config/fraud/
 ```
 
-Windows (PowerShell / cmd):
-
-```powershell
-move neo4j-fraud-mcp.exe C:\Windows\System32
-```
-
-Verify the neo4j-fraud-mcp installation:
-
-```bash
-neo4j-fraud-mcp -v
-```
-
-Should print the installed version.
-
-## Transport Modes
-
-The Neo4j Fraud MCP server supports two transport modes:
-
-- **STDIO** (default): Standard MCP communication via stdin/stdout for desktop clients (Claude Desktop, VSCode)
-- **HTTP**: RESTful HTTP server with per-request Basic Authentication for web-based clients and multi-tenant scenarios
-
-### Key Differences
-
-| Aspect               | STDIO                                                      | HTTP                                                                       |
-| -------------------- | ---------------------------------------------------------- | -------------------------------------------------------------------------- |
-| Startup Verification | Required - server verifies APOC, connectivity, queries     | Skipped - server starts immediately                                        |
-| Credentials          | Set via environment variables                              | Per-request via Basic Auth headers                                         |
-| Telemetry            | Collects Neo4j version, edition, Cypher version at startup | Reports "unknown-http-mode" - actual version info not available at startup |
-
-See the [Client Setup Guide](docs/CLIENT_SETUP.md) for configuration instructions for both modes.
-
-## TLS/HTTPS Configuration
-
-When using HTTP transport mode, you can enable TLS/HTTPS for secure communication:
-
-### Environment Variables
-
-- `NEO4J_MCP_HTTP_TLS_ENABLED` - Enable TLS/HTTPS: `true` or `false` (default: `false`)
-- `NEO4J_MCP_HTTP_TLS_CERT_FILE` - Path to TLS certificate file (required when TLS is enabled)
-- `NEO4J_MCP_HTTP_TLS_KEY_FILE` - Path to TLS private key file (required when TLS is enabled)
-- `NEO4J_MCP_HTTP_PORT` - HTTP server port (default: `443` when TLS enabled, `80` when TLS disabled)
-
-### Security Configuration
-
-- **Minimum TLS Version**: Hardcoded to TLS 1.2 (allows TLS 1.3 negotiation)
-- **Cipher Suites**: Uses Go's secure default cipher suites
-- **Default Port**: Automatically uses port 443 when TLS is enabled (standard HTTPS port)
-
-### Example Configuration
-
-```bash
-export NEO4J_URI="bolt://localhost:7687"
-export NEO4J_MCP_TRANSPORT="http"
-export NEO4J_MCP_HTTP_TLS_ENABLED="true"
-export NEO4J_MCP_HTTP_TLS_CERT_FILE="/path/to/cert.pem"
-export NEO4J_MCP_HTTP_TLS_KEY_FILE="/path/to/key.pem"
-
-neo4j-fraud-mcp
-# Server will listen on https://127.0.0.1:443 by default
-```
-
-**Production Usage**: Use certificates from a trusted Certificate Authority (e.g., Let's Encrypt, or your organisation) for production deployments.
-
-For detailed instructions on certificate generation, testing TLS, and production deployment, see [CONTRIBUTING.md](CONTRIBUTING.md#tlshttps-configuration).
-
-## Configuration Options
-
-The `neo4j-fraud-mcp` server can be configured using environment variables or CLI flags. CLI flags take precedence over environment variables.
-
-### Environment Variables
-
-See the [Client Setup Guide](docs/CLIENT_SETUP.md) for configuration examples.
-
-### CLI Flags
-
-You can override any environment variable using CLI flags:
-
-```bash
-neo4j-fraud-mcp --neo4j-uri "bolt://localhost:7687" \
-          --neo4j-username "neo4j" \
-          --neo4j-password "password" \
-          --neo4j-database "neo4j" \
-          --neo4j-read-only false \
-          --neo4j-telemetry true
-```
-
-Available flags:
-
-- `--neo4j-uri` - Neo4j connection URI (overrides NEO4J_URI)
-- `--neo4j-username` - Database username (overrides NEO4J_USERNAME)
-- `--neo4j-password` - Database password (overrides NEO4J_PASSWORD)
-- `--neo4j-database` - Database name (overrides NEO4J_DATABASE)
-- `--neo4j-read-only` - Enable read-only mode: `true` or `false` (overrides NEO4J_READ_ONLY)
-- `--neo4j-telemetry` - Enable telemetry: `true` or `false` (overrides NEO4J_TELEMETRY)
-- `--neo4j-schema-sample-size` - Modify the sample size used to infer the Neo4j schema
-- `--neo4j-transport-mode` - Transport mode: `stdio` or `http` (overrides NEO4J_MCP_TRANSPORT)
-- `--neo4j-http-host` - HTTP server host (overrides NEO4J_MCP_HTTP_HOST)
-- `--neo4j-http-port` - HTTP server port (overrides NEO4J_MCP_HTTP_PORT)
-- `--neo4j-http-tls-enabled` - Enable TLS/HTTPS: `true` or `false` (overrides NEO4J_MCP_HTTP_TLS_ENABLED)
-- `--neo4j-http-tls-cert-file` - Path to TLS certificate file (overrides NEO4J_MCP_HTTP_TLS_CERT_FILE)
-- `--neo4j-http-tls-key-file` - Path to TLS private key file (overrides NEO4J_MCP_HTTP_TLS_KEY_FILE)
-
-Use `neo4j-fraud-mcp --help` to see all available options.
-
-## Client Configuration
-
-To configure MCP clients (VSCode, Claude Desktop, etc.) to use the Neo4j Fraud MCP server, see:
-
-📘 **[Client Setup Guide](docs/CLIENT_SETUP.md)** – Complete configuration for STDIO and HTTP modes
+📂 **See [tools/config/README.md](tools/config/README.md)** for complete YAML format documentation and guidelines on creating custom tools.
 
 ## Tools & Usage
 
-### Core Tools
+The server provides two types of tools:
+
+### Infrastructure Tools (Hardcoded in Go)
+
+Core system operations that handle database interaction and metadata:
 
 | Tool                  | ReadOnly | Purpose                                              | Notes                                                                                                                          |
 | --------------------- | -------- | ---------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------ |
@@ -185,13 +86,20 @@ To configure MCP clients (VSCode, Claude Desktop, etc.) to use the Neo4j Fraud M
 | `write-cypher`        | `false`  | Execute arbitrary Cypher (write mode)                | **Caution:** LLM-generated queries could cause harm. Use only in development environments. Disabled if `NEO4J_READ_ONLY=true`. |
 | `list-gds-procedures` | `true`   | List GDS procedures available in the Neo4j instance  | Help the client LLM to have a better visibility on the GDS procedures available                                                |
 
-### Fraud Detection Tools
+### Config-Based Tools (Defined in YAML)
 
-| Tool                        | ReadOnly | Purpose                                                    | Notes                                                                                      |
-| --------------------------- | -------- | ---------------------------------------------------------- | ------------------------------------------------------------------------------------------ |
-| `detect-synthetic-identity` | `true`   | Detect synthetic identity fraud patterns                   | Identifies suspicious account behavior, shared devices/addresses, and fraud ring patterns  |
+Specialized investigation and guidance tools loaded from `tools/config/`:
 
-For detailed fraud tool documentation, see [docs/fraud-mcp/](docs/fraud-mcp/).
+| Tool                           | Category    | Purpose                                                 | Config File                                     |
+| ------------------------------ | ----------- | ------------------------------------------------------- | ----------------------------------------------- |
+| `detect-synthetic-identity`    | fraud       | Detect synthetic identity fraud patterns                | `fraud/detect-synthetic-identity.yaml`          |
+| `get-customer-profile`         | graph-data  | Retrieve comprehensive customer profiles               | `graph-data/get-customer-profile.yaml`          |
+| `get-transaction-history`      | graph-data  | Retrieve transaction history with filters               | `graph-data/get-transaction-history.yaml`       |
+| `get-sar-report-guidance`      | sar         | Suspicious Activity Report filing guidance              | `sar/get-sar-guidance.yaml`                     |
+| `generate-scene-action`        | bloom       | Guide for creating Neo4j Bloom Scene Actions            | `bloom/generate-scene-action.yaml`              |
+| `generate-search-phrase`       | bloom       | Guide for creating Neo4j Bloom Search Phrases           | `bloom/generate-search-phrase.yaml`             |
+
+**Adding Custom Tools**: Create a new YAML file in the appropriate category folder under `tools/config/`. The server will automatically discover and register it on next startup. See [tools/config/README.md](tools/config/README.md) for the YAML format specification.
 
 ### Readonly mode flag
 
@@ -231,41 +139,17 @@ Below are some example prompts you can try in Copilot or any other MCP client:
 - "Identify accounts connected to known fraudsters within 2 hops"
 - "Find customers with missing or expired KYC documents"
 
-## Security tips:
+## Security Best Practices
 
 - Use a restricted Neo4j user for exploration.
 - Review generated Cypher before executing in production databases.
-
-## Logging
-
-The server uses structured logging with support for multiple log levels and output formats.
-
-### Configuration
-
-**Log Level** (`NEO4J_LOG_LEVEL`, default: `info`)
-
-Controls the verbosity of log output. Supports all [MCP log levels](https://modelcontextprotocol.io/specification/2025-03-26/server/utilities/logging#log-levels): `debug`, `info`, `notice`, `warning`, `error`, `critical`, `alert`, `emergency`.
-
-**Log Format** (`NEO4J_LOG_FORMAT`, default: `text`)
-
-Controls the output format:
-
-- `text` - Human-readable text format (default)
-- `json` - Structured JSON format (useful for log aggregation)
-
-## Telemetry
-
-By default, `neo4j-fraud-mcp` collects anonymous usage data to help us improve the product.
-This includes information like the tools being used, the operating system, and CPU architecture.
-We do not collect any personal or sensitive information.
-
-To disable telemetry, set the `NEO4J_TELEMETRY` environment variable to `"false"`. Accepted values are `true` or `false` (default: `true`).
-
-You can also use the `--neo4j-telemetry` CLI flag to override this setting.
+- Enable read-only mode (`NEO4J_READ_ONLY=true`) for production environments to prevent accidental data modification.
 
 ## Documentation
 
-📘 **[Client Setup Guide](docs/CLIENT_SETUP.md)** – Configure VSCode, Claude Desktop, and other MCP clients (STDIO and HTTP modes)
-📚 **[Contributing Guide](CONTRIBUTING.md)** – Contribution workflow, development environment, mocks & testing
+📦 **[Setup Guide](SETUP.md)** – Installation, configuration, transport modes, TLS, logging, and telemetry
+📘 **[Client Setup Guide](docs/CLIENT_SETUP.md)** – Configure VSCode, Claude Desktop, and other MCP clients
+📂 **[Tool Configuration](tools/config/README.md)** – Create custom YAML-based tools
+📚 **[Contributing Guide](CONTRIBUTING.md)** – Development workflow, testing, and contributions
 
 Issues / feedback: open a GitHub issue with reproduction details (omit sensitive data).
