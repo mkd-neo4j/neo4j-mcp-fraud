@@ -1,0 +1,917 @@
+name: define-proceeds-of-crime
+title: Define Proceeds of Crime (User-Controlled Workflow)
+description: |
+  **CRITICAL COMPLIANCE TOOL** for defining "proceeds of crime" with 100% user control.
+
+  This tool guides you through a **7-phase conversational workflow** to ensure:
+  - ✅ User explicitly classifies which transactions are proceeds
+  - ✅ User provides reasoning for inclusion/exclusion decisions
+  - ✅ User confirms final quantum calculation
+  - ✅ Complete audit trail of all decisions
+  - ✅ No automated assumptions about proceeds
+
+  ---
+
+  ## WHY THIS MATTERS
+
+  **"Proceeds of crime include any monies or assets deriving directly or indirectly from criminal conduct"**
+
+  Getting this definition wrong can:
+  - ❌ Invalidate the entire SAR investigation
+  - ❌ Result in rejected SAR filings by NCA/FinCEN
+  - ❌ Lead to regulatory sanctions
+  - ❌ Compromise criminal prosecutions
+  - ❌ Create liability for the reporting institution
+
+  **This tool ensures you maintain full control and document your reasoning.**
+
+  ---
+
+  ## LEGAL FOUNDATION
+
+  From POCA 2002 and SAR Requirements:
+
+  **Proceeds of crime** include any monies or assets deriving:
+  - **Directly** from criminal conduct (single-hop: victim → criminal)
+  - **Indirectly** from criminal conduct (multi-hop: victim → intermediary → criminal)
+
+  **Criminal conduct includes:**
+  - Fraud (Fraud Act 2006)
+  - Theft (Theft Act 1968)
+  - Tax evasion (Tax Acts)
+  - Corruption/Bribery (Bribery Act 2010)
+
+  **SAR Section 2.2 requires:**
+  - Description of criminal property and quantum
+  - Chronological sequence of events
+  - State if value is UNKNOWN (estimates acceptable if clearly stated)
+  - Location of suspected property
+
+  ---
+
+  ## 7-PHASE WORKFLOW
+
+  ### Phase 1: Investigation Scope Definition
+
+  **YOUR TASK:** Define what you're investigating
+
+  **YOU MUST PROVIDE:**
+  1. **Criminal Activity Type**:
+     - fraud_by_misrepresentation
+     - theft
+     - tax_evasion
+     - bribery_corruption
+     - other (specify)
+
+  2. **Suspect Identification**:
+     - Customer ID(s)
+     - Account number(s)
+     - Any known entities involved
+
+  3. **Investigation Date Range**:
+     - Start date (when criminal activity began)
+     - End date (when it ended or was detected)
+
+  4. **Known Criminal Transactions** (if any):
+     - Transaction IDs you already know are criminal
+     - Evidence supporting this knowledge
+
+  **LLM ROLE:** Capture your scope definition, confirm back to you
+
+  **CONFIRMATION GATE:** You must explicitly confirm "This scope is correct" before proceeding
+
+  ---
+
+  ### Phase 2: Transaction Retrieval
+
+  **LLM TASK:** Retrieve ALL transactions in scope
+
+  **LLM EXECUTES:**
+  1. Calls `get-schema` to understand database structure
+  2. Calls `get-transaction-history` with your scope parameters
+  3. Retrieves COMPLETE transaction dataset (no filtering)
+
+  **LLM PRESENTS:**
+  - Full transaction list with all details:
+    - Transaction IDs, timestamps, amounts, currencies
+    - From/to accounts and customer details
+    - Geographic locations, IP addresses
+    - Transaction flags (structuring, velocity, round_amount, etc.)
+  - Summary statistics:
+    - Total transactions found
+    - Total monetary value
+    - Date range coverage
+    - Accounts involved
+
+  **LLM MAY HIGHLIGHT** (but NOT classify):
+  - Transactions flagged by fraud detection systems
+  - Patterns consistent with money laundering:
+    - Structuring (just below reporting thresholds)
+    - Round amounts
+    - Velocity anomalies
+    - Geographic inconsistencies
+    - High-risk jurisdictions
+
+  **CRITICAL:** LLM highlights patterns but makes NO decisions about proceeds
+
+  **YOUR ROLE:** Review all transactions, ask questions
+
+  **EXAMPLES OF QUESTIONS YOU MIGHT ASK:**
+  - "Show me only transactions over $10,000"
+  - "Which transactions went to high-risk jurisdictions?"
+  - "Show me the timeline of these transactions"
+  - "What accounts received money from Account ****1234?"
+
+  **CONFIRMATION GATE:** You say "Ready for Phase 3" when you've reviewed all data
+
+  ---
+
+  ### Phase 3: Direct Proceeds Classification
+
+  **DEFINITION:** Direct proceeds = Money flowing in ONE step from criminal act
+
+  **EXAMPLES:**
+  - Fraud: Payment directly from victim to fraudster's account
+  - Theft: Stolen funds transferred directly to thief's account
+  - Bribery: Bribe paid directly to official's account
+  - Tax evasion: Undeclared income deposited directly into hidden account
+
+  **YOUR TASK:** Explicitly classify which transactions are DIRECT proceeds
+
+  **YOU MUST PROVIDE:**
+  ```json
+  {
+    "directProceedsTransactionIds": ["tx-001", "tx-002", "tx-005"],
+    "reasoning": "Specific evidence-based reasoning for EACH transaction",
+    "evidenceSources": [
+      "Victim statements dated [dates]",
+      "Bank records showing transfers",
+      "Email correspondence proving fraud",
+      "etc."
+    ]
+  }
+  ```
+
+  **REASONING REQUIREMENTS:**
+  - WHY is each transaction a direct proceed?
+  - WHAT evidence supports this classification?
+  - WHO was the victim/source of funds?
+  - WHEN did the criminal act occur?
+
+  **LLM CONFIRMS BACK:**
+  ```
+  You have classified X transactions as DIRECT proceeds:
+  - tx-001: $50,000 (Date: 2024-01-15)
+  - tx-002: $30,000 (Date: 2024-01-20)
+  - tx-005: $20,000 (Date: 2024-02-01)
+
+  Total Direct Proceeds: $100,000
+
+  Your reasoning: "[your exact words]"
+
+  Your evidence sources:
+  - [list]
+
+  Is this correct?
+  ```
+
+  **CONFIRMATION GATE:**
+  - "Yes" → Proceed to Phase 4
+  - "No, modify" → Make corrections
+  - "Add more transactions" → Return to Phase 2
+
+  ---
+
+  ### Phase 4: Indirect Proceeds Path Discovery
+
+  **DEFINITION:** Indirect proceeds = Money flowing through MULTIPLE hops (layering)
+
+  **EXAMPLES:**
+  - Fraud proceeds transferred to shell company, then to another account, then to criminal's final account
+  - Stolen funds moved through 3 intermediary accounts to obscure origin
+  - Tax evasion money layered through offshore entities
+
+  **YOUR DECISION:** Do you want to trace downstream flows?
+
+  **OPTIONS:**
+
+  **Option 1: "Yes, trace all outflows (unlimited hops)"**
+  - LLM will find ALL downstream transactions from direct proceeds accounts
+  - Useful when: You suspect complex layering schemes
+  - Risk: May return large result sets
+
+  **Option 2: "Yes, trace up to N hops"** (you specify N)
+  - LLM limits search to N steps downstream
+  - Useful when: You know approximate layering depth
+  - Example: "Trace up to 5 hops"
+
+  **Option 3: "Yes, but only to accounts controlled by suspect"**
+  - LLM traces flows only to accounts linked to suspect (shared PII, devices, etc.)
+  - Useful when: You want to exclude legitimate third parties
+
+  **Option 4: "No, only count direct proceeds"**
+  - Skip to Phase 6 (no indirect proceeds)
+  - Useful when: Money stayed in one account or you can't prove control over downstream flows
+
+  **LLM EXECUTES (if you select Yes):**
+  ```cypher
+  // Trace money flows from direct proceeds accounts
+  MATCH path = (source:Account)-[:PERFORMS|BENEFITS_TO*1..$maxHops]->(dest:Account)
+  WHERE source.accountNumber IN $directProceedsAccounts
+    AND ANY(tx IN [rel IN relationships(path) WHERE type(rel) = 'PERFORMS' | rel]
+        WHERE tx.transactionId IN $directProceedsTransactionIds)
+  RETURN path,
+         nodes(path) as accounts,
+         [rel IN relationships(path) WHERE type(rel) = 'PERFORMS' | rel] as transactions
+  ```
+
+  **LLM PRESENTS:**
+  - **Visual representation** of money flow chains
+  - **Each downstream transaction** with full context:
+    - Transaction ID, amount, date
+    - From/to accounts
+    - Customer details (if known)
+    - Geographic locations
+    - Flags and risk indicators
+  - **Chain summaries**:
+    - Chain 1: Account A → tx-010 ($48k) → Account B → tx-011 ($46k) → Account C
+    - Chain 2: Account A → tx-012 ($10k) → Account D (ABC Company - creditor)
+    - etc.
+
+  **CRITICAL:** These are POTENTIAL indirect proceeds - you must classify them in Phase 5
+
+  **YOUR ROLE:** Review all discovered paths, ask questions
+
+  **EXAMPLES OF QUESTIONS:**
+  - "Show me evidence that Account C is controlled by the suspect"
+  - "What's the timeline for Chain 1?"
+  - "Are there any shared devices or IPs between these accounts?"
+  - "Who owns Account D?"
+
+  **CONFIRMATION GATE:** You say "Ready for Phase 5" when you've reviewed all paths
+
+  ---
+
+  ### Phase 5: Indirect Proceeds Classification
+
+  **YOUR TASK:** Explicitly classify which downstream transactions are INDIRECT proceeds
+
+  **CLASSIFICATION OPTIONS:**
+
+  **Option 1: "All transactions in these paths"**
+  - Include entire layering chain
+  - Use when: Suspect controlled all intermediary accounts
+  - Example: "All transactions in Chain 1 and Chain 3"
+
+  **Option 2: "Only transactions matching criteria X"**
+  - Include transactions meeting specific criteria
+  - Use when: You have clear inclusion rules
+  - Examples:
+    - "Only transactions to accounts with shared PII with suspect"
+    - "Only transactions within 7 days of direct proceeds"
+    - "Only transactions in same currency"
+
+  **Option 3: "Specific transaction IDs"** (you select)
+  - Manual selection of individual transactions
+  - Use when: Complex situation requiring case-by-case judgment
+
+  **Option 4: "None - direct proceeds only"**
+  - No indirect proceeds included
+  - Use when: Can't prove suspect controlled downstream flows
+
+  **YOU MUST PROVIDE:**
+  ```json
+  {
+    "indirectProceedsMethod": "specific_transactions",
+    "transactionIds": ["tx-010", "tx-011", "tx-015"],
+    "reasoning": "Evidence-based reasoning for EACH transaction or chain",
+    "evidenceSources": [
+      "Device fingerprint analysis shows suspect accessed Account B",
+      "IP address logs match suspect's known locations",
+      "Shared email addresses between Account A and Account C",
+      "Account ownership documents show suspect is beneficial owner",
+      "etc."
+    ],
+    "excludedTransactionIds": ["tx-012", "tx-013"],
+    "exclusionReasoning": "Why these transactions are NOT proceeds",
+    "exclusionEvidence": [
+      "Account D belongs to ABC Company, a legitimate creditor",
+      "Transaction tx-012 was for legitimate debt repayment",
+      "No evidence suspect controlled Account D"
+    ]
+  }
+  ```
+
+  **CRITICAL:** You must document BOTH inclusions AND exclusions
+
+  **LLM CONFIRMS BACK:**
+  ```
+  INDIRECT PROCEEDS CLASSIFICATION
+
+  Included as Indirect Proceeds:
+  - tx-010: $48,000 (Date: 2024-01-16) - Chain 1, Hop 1
+  - tx-011: $46,000 (Date: 2024-01-17) - Chain 1, Hop 2
+  - tx-015: $42,000 (Date: 2024-02-05) - Chain 3, Final destination
+
+  Total Indirect Proceeds: $136,000
+
+  Your reasoning: "[your exact words]"
+  Your evidence: [list]
+
+  ---
+
+  EXCLUDED Transactions (NOT proceeds):
+  - tx-012: $10,000 (Date: 2024-01-18) - Payment to legitimate creditor
+  - tx-013: $5,000 (Date: 2024-01-19) - Payment to legitimate creditor
+
+  Exclusion reasoning: "[your exact words]"
+  Exclusion evidence: [list]
+
+  ---
+
+  SUMMARY:
+  - Direct Proceeds: 3 transactions = $100,000
+  - Indirect Proceeds: 3 transactions = $136,000
+  - Excluded: 2 transactions = $15,000
+
+  Is this correct?
+  ```
+
+  **CONFIRMATION GATE:**
+  - "Yes" → Proceed to Phase 6
+  - "No, modify" → Make corrections
+  - "Go back to Phase 4" → Trace more paths
+
+  ---
+
+  ### Phase 6: Quantum Calculation Method
+
+  **YOUR TASK:** Select how to calculate the final quantum (total amount)
+
+  **CALCULATION METHODS:**
+
+  **Method 1: Sum**
+  - **Calculation:** Add all direct + indirect transaction amounts
+  - **Formula:** `sum(direct) + sum(indirect)`
+  - **Example:** $100,000 + $136,000 = $236,000
+  - **Use when:** You want to show total volume of proceeds moved
+  - **SAR Section 2.2:** "Total proceeds of crime totaling $236,000..."
+
+  **Method 2: Net (Inflows - Outflows)**
+  - **Calculation:** Total money in minus total money out from suspect accounts
+  - **Formula:** `sum(inflows) - sum(outflows)`
+  - **Example:** $300,000 in - $64,000 out = $236,000 net
+  - **Use when:** You want to show how much suspect retained
+  - **SAR Section 2.2:** "Net proceeds retained by suspect: $236,000..."
+
+  **Method 3: Peak Balance**
+  - **Calculation:** Maximum balance reached in suspect accounts during period
+  - **Formula:** `max(account_balances_over_time)`
+  - **Example:** Account reached peak of $150,000 on 2024-02-15
+  - **Use when:** You want to show maximum criminal property possessed at one time
+  - **SAR Section 2.2:** "Suspect possessed criminal property valued at $150,000 at peak..."
+
+  **Method 4: Final Destination Amount**
+  - **Calculation:** Amount remaining at end of chain (after fees/losses)
+  - **Formula:** Last transaction amount in chain
+  - **Example:** Final transaction was $45,000 (lost $55,000 to fees)
+  - **Use when:** You want to show actual proceeds retained after layering costs
+  - **SAR Section 2.2:** "Proceeds ultimately retained: $45,000..."
+
+  **Method 5: Custom (you define)**
+  - **Calculation:** Your custom formula
+  - **Use when:** None of the above fit your situation
+
+  **YOU MUST PROVIDE:**
+  ```json
+  {
+    "calculationMethod": "sum",
+    "reasoning": "I selected sum because we need to demonstrate the total volume of criminal proceeds moved through the banking system, not just what was retained. This shows the full scale of the money laundering operation.",
+    "quantum": {
+      "directProceeds": 100000.00,
+      "indirectProceeds": 136000.00,
+      "totalProceeds": 236000.00,
+      "isEstimate": false,
+      "confidence": "high"
+    }
+  }
+  ```
+
+  **SPECIAL CASES:**
+
+  **If amount is UNKNOWN or partially known:**
+  ```json
+  {
+    "isEstimate": true,
+    "confidence": "medium",
+    "estimateReasoning": "Some transactions did not have amounts recorded. We estimated based on average transaction values.",
+    "knownAmount": 150000.00,
+    "estimatedAmount": 86000.00,
+    "totalProceeds": 236000.00
+  }
+  ```
+
+  **SAR Requirements:** If quantum is UNKNOWN, you MUST state "UNKNOWN" explicitly
+
+  **LLM CONFIRMS BACK:**
+  ```
+  QUANTUM CALCULATION
+
+  Method: Sum (total volume)
+  Your reasoning: "[your exact words]"
+
+  Calculation:
+  - Direct Proceeds: $100,000
+  - Indirect Proceeds: $136,000
+  - Total Proceeds: $236,000
+
+  Is Estimate: No
+  Confidence: High
+
+  Is this correct?
+  ```
+
+  **CONFIRMATION GATE:**
+  - "Yes" → Proceed to Phase 7
+  - "No, change method" → Select different calculation
+
+  ---
+
+  ### Phase 7: Final Confirmation & Documentation
+
+  **LLM PRESENTS:** Complete summary with full audit trail
+
+  ```markdown
+  # PROCEEDS OF CRIME DEFINITION - FINAL SUMMARY
+
+  ## Investigation Scope
+  - **Criminal Activity:** Fraud by misrepresentation (Fraud Act 2006)
+  - **Suspect:** Customer C12345 (John Smith)
+  - **Investigation Period:** 2024-01-01 to 2024-03-31
+  - **Accounts Involved:** [list]
+  - **Confirmed at:** 2024-03-15T09:30:00Z
+
+  ---
+
+  ## Classification Results
+
+  ### Direct Proceeds (User Confirmed ✅)
+
+  | Transaction ID | Date | Amount | Details |
+  |---------------|------|--------|---------|
+  | tx-001 | 2024-01-15 | $50,000 | Wire from victim Account ****7890 |
+  | tx-002 | 2024-01-20 | $30,000 | Wire from victim Account ****7890 |
+  | tx-005 | 2024-02-01 | $20,000 | Wire from victim Account ****7890 |
+
+  **Total Direct Proceeds:** $100,000
+
+  **Your Reasoning:**
+  "These three wire transfers represent the fraudulent proceeds directly obtained from the victim through misrepresentation about investment opportunities. The victim believed they were investing in legitimate ventures but funds went directly to suspect's account."
+
+  **Evidence Sources:**
+  - Victim witness statement dated 2024-02-15
+  - Bank records showing transfers from victim account
+  - Email correspondence proving fraudulent misrepresentation
+  - Contract documents showing false investment claims
+
+  **Confirmed at:** 2024-03-15T10:15:00Z ✅
+
+  ---
+
+  ### Indirect Proceeds (User Confirmed ✅)
+
+  **Money Flow Chain:**
+  ```
+  Direct Proceeds Account (****1234)
+    ↓ tx-010: $48,000 (2024-01-16)
+  Shell Company Account (****5678)
+    ↓ tx-011: $46,000 (2024-01-17)
+  Offshore Account (****3333)
+    ↓ tx-015: $45,000 (2024-01-18)
+  Final Destination Account (****9999)
+  ```
+
+  | Transaction ID | Date | Amount | Hop | Details |
+  |---------------|------|--------|-----|---------|
+  | tx-010 | 2024-01-16 | $48,000 | 1 | To shell company account |
+  | tx-011 | 2024-01-17 | $46,000 | 2 | To offshore account |
+  | tx-015 | 2024-01-18 | $45,000 | 3 | To final destination |
+
+  **Total Indirect Proceeds Flow:** $139,000 (sum of all hops)
+  **OR Final Destination Amount:** $45,000 (after fees)
+
+  **Your Reasoning:**
+  "These transactions represent layering of the original fraud proceeds through intermediary accounts to obscure the criminal origin. Evidence shows suspect controlled all three intermediary accounts based on shared device fingerprints, IP addresses matching suspect's known locations, and beneficial ownership documents."
+
+  **Evidence Sources:**
+  - Device fingerprint analysis (Account ****5678 accessed from same device as suspect's primary account)
+  - IP address logs (Transactions originated from suspect's home address)
+  - Shared email addresses (****3333 uses suspect's alternate email)
+  - Corporate registry documents (Suspect is beneficial owner of shell company)
+
+  **Confirmed at:** 2024-03-15T10:45:00Z ✅
+
+  ---
+
+  ### Excluded Transactions (User Confirmed ✅)
+
+  | Transaction ID | Date | Amount | Destination | Exclusion Reason |
+  |---------------|------|--------|-------------|------------------|
+  | tx-012 | 2024-01-18 | $10,000 | ABC Creditors Ltd | Legitimate debt repayment |
+  | tx-013 | 2024-01-19 | $5,000 | XYZ Utilities | Utility bill payment |
+
+  **Total Excluded:** $15,000
+
+  **Your Exclusion Reasoning:**
+  "These transactions went to legitimate third-party creditors for documented debts. No evidence suggests these entities were controlled by suspect or part of the money laundering scheme. They represent normal business expenses unrelated to the criminal proceeds."
+
+  **Exclusion Evidence:**
+  - ABC Creditors Ltd is registered UK company with no links to suspect
+  - Documentary evidence of legitimate debt (loan agreement dated 2023-05-01)
+  - XYZ Utilities is established utility provider
+  - Utility bills match suspect's registered address
+
+  **Confirmed at:** 2024-03-15T10:45:00Z ✅
+
+  ---
+
+  ## Final Quantum Calculation
+
+  **Method Selected:** Sum (total volume of proceeds moved)
+
+  **Calculation:**
+  ```
+  Direct Proceeds:    $100,000
+  Indirect Proceeds:  $139,000 (sum of all transactions in chain)
+  ─────────────────────────────
+  Total Proceeds:     $239,000
+  ```
+
+  **Your Method Justification:**
+  "I selected the sum method to demonstrate the total volume of criminal proceeds that were moved through the banking system. This shows the full scale of the money laundering operation and the extent of the suspect's criminal activity, which is relevant for SAR Section 2.2 quantum reporting."
+
+  **Alternative Calculation (Final Destination Method):**
+  ```
+  Direct Proceeds:    $100,000
+  Final Amount:       $ 45,000 (after layering costs)
+  ─────────────────────────────
+  Total Proceeds:     $145,000
+  ```
+
+  **Metadata:**
+  - **Is Estimate:** No (all amounts verified from bank records)
+  - **Confidence:** High
+  - **Currency:** USD
+  - **Confirmed at:** 2024-03-15T11:00:00Z ✅
+
+  ---
+
+  ## Complete Audit Trail
+
+  | Phase | Completed | Duration | User Action | System Action |
+  |-------|-----------|----------|-------------|---------------|
+  | 1. Scope Definition | 2024-03-15 09:30:00 | 5 min | Defined investigation scope | Captured scope parameters |
+  | 2. Transaction Retrieval | 2024-03-15 09:45:00 | 15 min | Reviewed 47 transactions | Retrieved full transaction dataset |
+  | 3. Direct Proceeds | 2024-03-15 10:15:00 | 30 min | Classified 3 transactions | Confirmed $100k direct proceeds |
+  | 4. Path Discovery | 2024-03-15 10:30:00 | 15 min | Requested 5-hop trace | Discovered 3 transaction chains |
+  | 5. Indirect Proceeds | 2024-03-15 10:45:00 | 15 min | Classified 3 transactions, excluded 2 | Confirmed $139k indirect proceeds |
+  | 6. Calculation Method | 2024-03-15 10:55:00 | 5 min | Selected "sum" method | Applied calculation |
+  | 7. Final Confirmation | 2024-03-15 11:00:00 | 5 min | Confirmed all decisions | Generated final report |
+
+  **Total Workflow Duration:** 1 hour 30 minutes
+  **Total Decisions Made by User:** 7 major decisions + multiple confirmations
+  **System Automated Decisions:** 0 (all classifications user-controlled)
+
+  ---
+
+  ## SAR Section 2.2 Ready Output
+
+  This proceeds definition is ready for inclusion in SAR Section 2.2:
+
+  ```
+  The suspected proceeds of crime total $239,000 (two hundred thirty-nine thousand
+  dollars USD), deriving from fraud by misrepresentation committed by [suspect name]
+  against [victim name].
+
+  Between January 1, 2024 and March 31, 2024, the proceeds were obtained and
+  subsequently laundered through a series of intermediary accounts in the following
+  chronological sequence:
+
+  DIRECT PROCEEDS:
+  Three fraudulent wire transfers totaling $100,000 were made directly from the
+  victim's account (****7890) to the suspect's account (****1234) on the following dates:
+  - January 15, 2024: $50,000
+  - January 20, 2024: $30,000
+  - February 1, 2024: $20,000
+
+  These transfers were obtained through fraudulent misrepresentation regarding
+  investment opportunities, as evidenced by victim statements and email correspondence.
+
+  INDIRECT PROCEEDS (LAYERING):
+  The original $100,000 was subsequently layered through three intermediary accounts
+  to obscure the criminal origin:
+
+  1. January 16, 2024: $48,000 transferred from suspect's account (****1234) to
+     shell company account (****5678)
+  2. January 17, 2024: $46,000 transferred to offshore account (****3333)
+  3. January 18, 2024: $45,000 transferred to final destination account (****9999)
+
+  Evidence demonstrates the suspect controlled all intermediary accounts, including
+  device fingerprint analysis, IP address logs matching suspect's known locations,
+  and beneficial ownership documentation.
+
+  QUANTUM: $239,000
+  The quantum represents the total volume of criminal proceeds moved through the
+  banking system (sum of all direct and indirect transactions).
+
+  PROPERTY LOCATION: Final proceeds are held in Account ****9999, registered in
+  [jurisdiction].
+
+  This calculation excludes $15,000 in transactions to legitimate creditors (ABC
+  Creditors Ltd and XYZ Utilities) which were documented as legitimate business
+  expenses unrelated to the criminal proceeds.
+  ```
+
+  ---
+
+  ## User Final Confirmation
+
+  **Question:** Is this your final definition of "proceeds of crime" for this investigation?
+
+  ☐ **YES** - I confirm this definition is accurate and complete ✅
+  ☐ **NO** - I need to modify (specify which phase to return to)
+  ☐ **SAVE DRAFT** - Save current state but don't finalize
+
+  **If YES selected:**
+
+  By confirming, you certify that:
+  - ✅ All transaction classifications are based on evidence
+  - ✅ Reasoning for inclusions and exclusions is documented
+  - ✅ Quantum calculation method is appropriate
+  - ✅ This definition is ready for SAR Section 2.2
+  - ✅ You accept responsibility for this proceeds definition
+
+  **Confirmed by:** [Your name/user ID]
+  **Confirmed at:** 2024-03-15T11:00:00Z
+  **Digital signature:** [hash of all decisions for audit trail]
+
+  ---
+
+  ## Output for Integration
+
+  This definition can now be used in:
+  - ✅ SAR Section 2.2 (Nature of criminal property and quantum)
+  - ✅ SAR Section 5.4 (Criminal property description for defence)
+  - ✅ Investigation case files
+  - ✅ Regulatory submissions
+  - ✅ Criminal prosecution evidence packages
+
+  Complete JSON output saved to investigation file.
+  ```
+
+  ---
+
+  **YOUR FINAL CONFIRMATION:**
+
+  Type "CONFIRM" to finalize this proceeds definition, or:
+  - "MODIFY [phase number]" to return to a specific phase
+  - "SAVE DRAFT" to save without finalizing
+  - "CANCEL" to discard (you will be asked to confirm cancellation)
+
+  ---
+
+  ## KEY SAFEGUARDS IN THIS WORKFLOW
+
+  ### 1. No Automated Decisions
+  - ✅ LLM NEVER classifies transactions without your explicit approval
+  - ✅ All pattern highlighting is informational only
+  - ✅ System presents data, user makes decisions
+
+  ### 2. Reasoning Required
+  - ✅ You must document WHY for each classification
+  - ✅ Evidence sources must be specified
+  - ✅ Exclusions must be justified (why NOT proceeds)
+
+  ### 3. Multiple Confirmation Gates
+  - ✅ Scope definition confirmed (Phase 1)
+  - ✅ Direct proceeds confirmed (Phase 3)
+  - ✅ Indirect proceeds confirmed (Phase 5)
+  - ✅ Calculation method confirmed (Phase 6)
+  - ✅ Final proceeds definition confirmed (Phase 7)
+
+  ### 4. Complete Audit Trail
+  - ✅ Timestamp for every phase completion
+  - ✅ Capture of all user decisions verbatim
+  - ✅ Documentation of reasoning at each step
+  - ✅ Proof of user confirmation gates passed
+
+  ### 5. Reversibility
+  - ✅ Can return to any previous phase
+  - ✅ Can modify classifications at any time
+  - ✅ Draft saves before final confirmation
+  - ✅ Clear "last modified" tracking
+
+  ### 6. Evidence-Based
+  - ✅ Tie each classification to specific evidence
+  - ✅ Document evidence sources
+  - ✅ Explain exclusions with evidence
+  - ✅ Audit trail includes evidence references
+
+  ### 7. SAR-Compliant Output
+  - ✅ Ready for SAR Section 2.2
+  - ✅ Meets chronological sequence requirement
+  - ✅ Includes quantum with confidence level
+  - ✅ Documents property location
+  - ✅ States if estimate (with reasoning)
+
+  ---
+
+  ## INTEGRATION WITH OTHER TOOLS
+
+  After completing this workflow, the proceeds definition can be used by:
+
+  **`get-transaction-history`**:
+  - Use your classified transaction IDs to retrieve detailed records
+  - Generate chronological narratives for SAR Section 2.1
+
+  **`get-customer-profile`**:
+  - Cross-reference proceeds with customer identity data
+  - Populate SAR Section 1.3 with subject information
+
+  **`find-related-parties`**:
+  - Identify other individuals involved in handling proceeds
+  - Populate SAR Section 2.5 (other parties)
+
+  **`generate-sar-report`**:
+  - Use this proceeds definition for Section 2.2
+  - Auto-populate quantum and narrative
+
+  ---
+
+  ## EXAMPLE USAGE
+
+  **User**: "I need to define proceeds for a fraud investigation"
+
+  **Assistant**: "I'll guide you through a 7-phase workflow to ensure you have complete
+  control over defining proceeds of crime.
+
+  **PHASE 1: INVESTIGATION SCOPE**
+
+  Please provide:
+  1. What criminal activity is suspected?
+  2. What customer/account IDs are involved?
+  3. What date range should we investigate?
+  4. Do you have any known criminal transaction IDs already?"
+
+  **User**: "Fraud by misrepresentation. Customer C12345. January 1 to March 31, 2024.
+  I know transactions tx-001, tx-002, and tx-005 are fraudulent based on victim statements."
+
+  **Assistant**: "Understood. Investigation scope:
+  - Criminal Activity: Fraud by misrepresentation (Fraud Act 2006)
+  - Suspect: Customer C12345
+  - Date Range: 2024-01-01 to 2024-03-31
+  - Known Criminal Transactions: tx-001, tx-002, tx-005 (from victim statements)
+
+  Is this correct? (yes/no/modify)"
+
+  **User**: "Yes"
+
+  **Assistant**: "**PHASE 2: TRANSACTION RETRIEVAL**
+
+  Let me retrieve all transactions for Customer C12345 in this period...
+
+  [Calls get-schema]
+  [Calls get-transaction-history]
+
+  I found 47 transactions totaling $458,923.45. Here's the complete dataset:
+
+  [Displays full transaction table]
+
+  I notice these patterns (informational only - you will classify):
+  - 3 transactions flagged for structuring (just below $10k threshold)
+  - 4 transactions to high-risk jurisdictions
+  - 8 round-amount transactions
+  - Your 3 known criminal transactions (tx-001, tx-002, tx-005)
+
+  Would you like to:
+  - Review all 47 transactions
+  - Filter by criteria (amount, date, destination, etc.)
+  - Ask questions about patterns
+  - Proceed to Phase 3 when ready"
+
+  [... conversation continues through all 7 phases with user making all decisions ...]
+
+  ---
+
+  ## IMPORTANT NOTES
+
+  ### LLM Role Limitations
+
+  **LLM CAN:**
+  - ✅ Execute queries you request
+  - ✅ Present transaction data for your review
+  - ✅ Highlight patterns (structuring, layering, etc.) as informational
+  - ✅ Trace money flows through graph paths
+  - ✅ Confirm back your decisions
+  - ✅ Document your reasoning verbatim
+  - ✅ Generate SAR-ready narratives from your classifications
+
+  **LLM CANNOT:**
+  - ❌ Classify transactions as proceeds without your approval
+  - ❌ Make assumptions about which transactions are criminal
+  - ❌ Decide calculation methods on your behalf
+  - ❌ Exclude transactions without your justification
+  - ❌ Finalize proceeds definition without your confirmation
+
+  ### Your Responsibilities
+
+  **YOU MUST:**
+  - ✅ Provide evidence-based reasoning for all classifications
+  - ✅ Document why transactions are included OR excluded
+  - ✅ Confirm your decisions at each phase gate
+  - ✅ Select appropriate calculation method for quantum
+  - ✅ Take responsibility for final proceeds definition
+
+  **YOU CONTROL:**
+  - ✅ Investigation scope
+  - ✅ Transaction classifications (direct/indirect/excluded)
+  - ✅ Evidence interpretation
+  - ✅ Quantum calculation method
+  - ✅ Final proceeds definition
+
+  ### Legal and Compliance Notes
+
+  **This tool does NOT:**
+  - ❌ Provide legal advice
+  - ❌ Replace professional judgment
+  - ❌ Guarantee regulatory acceptance
+  - ❌ Make criminal liability determinations
+
+  **You should:**
+  - ✅ Consult MLRO/compliance team before finalizing
+  - ✅ Review with legal counsel if needed
+  - ✅ Ensure evidence supports all classifications
+  - ✅ Follow your institution's SAR policies
+
+  **Regulatory Standards:**
+  - This workflow is designed to meet POCA 2002 and SAR requirements
+  - Complete documentation supports NCA/FinCEN submissions
+  - Audit trail demonstrates due diligence
+  - User control ensures professional judgment is exercised
+
+  ---
+
+  ## NEXT STEPS AFTER COMPLETION
+
+  Once you've confirmed your proceeds definition:
+
+  1. **Review with Compliance Team**
+     - Share proceeds definition and audit trail
+     - Confirm calculation method is appropriate
+     - Ensure evidence is sufficient
+
+  2. **Integrate with SAR Section 2.2**
+     - Use generated narrative in SAR filing
+     - Reference transaction IDs in supporting documents
+     - Include evidence sources
+
+  3. **Complete Remaining SAR Sections**
+     - Use other tools to populate Sections 1.3, 2.1, 2.3, etc.
+     - Ensure consistency across all sections
+
+  4. **Prepare Supporting Evidence**
+     - Attach transaction records
+     - Include device/IP analysis results
+     - Provide ownership documentation
+     - Include victim statements
+
+  5. **Final SAR Review**
+     - MLRO review and approval
+     - Legal counsel review (if applicable)
+     - Submit to NCA/FinCEN within deadlines
+
+  ---
+
+  ## VERSION HISTORY
+
+  - **v1.0** (2024-03-15): Initial release - 7-phase user-controlled workflow
+
+  ---
+
+  **Ready to begin?**
+
+  Tell me you want to start, and I'll begin with Phase 1: Investigation Scope Definition.
+
+execution:
+  mode: read
+  timeout: 300000  # 5 minutes for full workflow (can be extended if needed)
+
+metadata:
+  readonly: true
+  idempotent: true
+  destructive: false
+  category: sar-compliance
+  criticality: high
+  requires_user_confirmation: true
+  audit_trail: true
+  version: "1.0"
