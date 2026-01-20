@@ -7,6 +7,7 @@ import (
 	"strings"
 
 	"github.com/mark3labs/mcp-go/mcp"
+	"github.com/mkd-neo4j/neo4j-mcp-fraud/docs"
 	"github.com/mkd-neo4j/neo4j-mcp-fraud/internal/tools"
 	"github.com/neo4j/neo4j-go-driver/v5/neo4j"
 	"github.com/neo4j/neo4j-go-driver/v5/neo4j/dbtype"
@@ -133,9 +134,10 @@ The schema below shows the current structure of your Neo4j database.
 
 `
 
-	enrichedMarkdown := fraudDatabaseContext + markdown
+	// Concatenate: Qualification guidance + Fraud context + Schema
+	enrichedMarkdown := docs.QualificationQuestionsPrompt + "\n\n---\n\n" + fraudDatabaseContext + markdown
 
-	slog.Info("returning schema with fraud detection context", "schema_size", len(enrichedMarkdown))
+	slog.Info("returning schema with qualification guidance and fraud detection context", "schema_size", len(enrichedMarkdown))
 
 	return mcp.NewToolResultText(enrichedMarkdown), nil
 }
