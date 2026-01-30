@@ -14,6 +14,10 @@ tools/config/
 ├── graph-data/             # Data retrieval tools
 │   ├── get-customer-profile.yaml
 │   └── get-transaction-history.yaml
+├── liquidity/              # Liquidity analysis tools
+│   ├── analyze-account-fund-flow.yaml
+│   ├── analyze-merchant-revenue-flows.yaml
+│   └── identify-liquidity-concentration.yaml
 └── sar/                    # SAR-related tools
     └── get-sar-guidance.yaml
 ```
@@ -89,6 +93,11 @@ metadata:
 
 #### SAR & Compliance Tools
 - ✅ `get-sar-report-guidance` - Suspicious Activity Report filing guidance (documentation-only)
+
+#### Liquidity Analysis Tools
+- ✅ `analyze-account-fund-flow` - Analyzes inflows/outflows for an account
+- ✅ `identify-liquidity-concentration` - Finds high-volume accounts (liquidity hubs)
+- ✅ `analyze-merchant-revenue-flows` - Analyzes payment flows to merchants/banks
 
 ### Hardcoded Tools (Go)
 - `get-schema` - Schema introspection

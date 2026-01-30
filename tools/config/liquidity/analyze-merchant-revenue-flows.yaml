@@ -1,0 +1,99 @@
+name: analyze-merchant-revenue-flows
+description: |
+  Analyzes transaction flows to merchants and banks to understand revenue distribution and payment patterns.
+
+intent: |
+  Provide revenue flow analysis for business intelligence and relationship management:
+  - Merchant analytics: Track payment volumes to merchant partners
+  - Bank relationship: Monitor transaction flows to correspondent banks
+  - Revenue distribution: Understand how funds flow to different beneficiaries
+  - Partner performance: Compare transaction volumes across merchants/banks
+
+expected_patterns:
+  - entity: Merchant
+    shared_elements: [Transaction, BENEFITS_TO, Amount, Account]
+    anomaly: Merchants with significant transaction volume changes
+  - entity: Bank
+    shared_elements: [Transaction, BENEFITS_TO, Amount, Account]
+    anomaly: Banks receiving concentrated payment flows
+  - entity: Payment Pattern
+    shared_elements: [Account, Merchant, Amount]
+    anomaly: Unusual payment patterns to specific merchants
+
+reference_cypher: |
+  // Top merchants by transaction volume
+  MATCH (a:Account)-[:PERFORM]->(tx:Transaction)-[:BENEFITS_TO]->(m:Merchant)
+  WITH m,
+       count(tx) AS transactionCount,
+       sum(tx.amount) AS totalRevenue,
+       count(DISTINCT a) AS uniquePayingAccounts
+  RETURN {
+    merchantId: m.id,
+    merchantName: m.name,
+    transactionCount: transactionCount,
+    totalRevenue: totalRevenue,
+    averageTransactionAmount: totalRevenue / transactionCount,
+    uniquePayingAccounts: uniquePayingAccounts
+  } AS merchantRevenue
+  ORDER BY totalRevenue DESC
+  LIMIT $limit
+
+  // Top banks by transaction volume
+  MATCH (a:Account)-[:PERFORM]->(tx:Transaction)-[:BENEFITS_TO]->(b:Bank)
+  WITH b,
+       count(tx) AS transactionCount,
+       sum(tx.amount) AS totalVolume,
+       count(DISTINCT a) AS uniqueSendingAccounts
+  RETURN {
+    bankId: b.id,
+    bankName: b.name,
+    transactionCount: transactionCount,
+    totalVolume: totalVolume,
+    averageTransactionAmount: totalVolume / transactionCount,
+    uniqueSendingAccounts: uniqueSendingAccounts
+  } AS bankVolume
+  ORDER BY totalVolume DESC
+  LIMIT $limit
+
+  // Specific merchant revenue analysis
+  MATCH (m:Merchant {id: $merchantId})
+  MATCH (a:Account)-[:PERFORM]->(tx:Transaction)-[:BENEFITS_TO]->(m)
+  OPTIONAL MATCH (c:Customer)-[:HAS_ACCOUNT]->(a)
+  WITH m, tx, a, c
+  RETURN {
+    merchantId: m.id,
+    merchantName: m.name,
+    totalRevenue: sum(tx.amount),
+    totalTransactions: count(tx),
+    uniqueCustomers: count(DISTINCT c),
+    uniqueAccounts: count(DISTINCT a)
+  } AS merchantDetail
+
+  // Revenue flow by beneficiary type
+  MATCH (a:Account)-[:PERFORM]->(tx:Transaction)-[:BENEFITS_TO]->(beneficiary)
+  WITH labels(beneficiary)[0] AS beneficiaryType,
+       count(tx) AS transactionCount,
+       sum(tx.amount) AS totalAmount
+  RETURN {
+    beneficiaryType: beneficiaryType,
+    transactionCount: transactionCount,
+    totalAmount: totalAmount,
+    averageAmount: totalAmount / transactionCount
+  } AS revenueByType
+  ORDER BY totalAmount DESC
+
+reference_schema:
+  labels: [Account, Transaction, Customer, Bank, Merchant]
+  relationships: [PERFORM, BENEFITS_TO, HAS_ACCOUNT]
+
+parameters:
+  - name: merchantId
+    type: string
+    description: Optional - specific merchant ID for detailed analysis
+  - name: bankId
+    type: string
+    description: Optional - specific bank ID for detailed analysis
+  - name: limit
+    type: integer
+    default: 25
+    description: Maximum number of results to return

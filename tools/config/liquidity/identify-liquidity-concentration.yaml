@@ -1,0 +1,95 @@
+name: identify-liquidity-concentration
+description: |
+  Identifies accounts with high transaction volumes to understand liquidity concentration points in the network.
+
+intent: |
+  Discover liquidity concentration patterns for treasury and risk management:
+  - Hub identification: Find accounts that act as central liquidity hubs
+  - Volume analysis: Identify high-volume accounts for priority monitoring
+  - Network topology: Understand how funds flow through the account network
+  - Concentration risk: Assess dependency on key accounts for liquidity distribution
+
+expected_patterns:
+  - entity: Account
+    shared_elements: [Transaction, PERFORM, BENEFITS_TO, Volume]
+    anomaly: Accounts with disproportionately high transaction counts indicating hub status
+  - entity: Account Network
+    shared_elements: [Account, Transaction, Volume]
+    anomaly: Small number of accounts handling majority of transaction volume
+  - entity: Liquidity Hub
+    shared_elements: [Account, Inflow, Outflow, NetPosition]
+    anomaly: Accounts acting as intermediaries with balanced high inflows and outflows
+
+reference_cypher: |
+  // Find top accounts by outflow volume
+  MATCH (a:Account)-[:PERFORM]->(tx:Transaction)
+  WITH a,
+       count(tx) AS outflowCount,
+       sum(tx.amount) AS outflowTotal
+  WHERE outflowCount >= $minTransactionCount
+  RETURN {
+    accountNumber: a.accountNumber,
+    accountId: a.id,
+    outflowCount: outflowCount,
+    outflowTotal: outflowTotal,
+    avgOutflowAmount: outflowTotal / outflowCount
+  } AS outflowConcentration
+  ORDER BY outflowTotal DESC
+  LIMIT $limit
+
+  // Find top accounts by inflow volume
+  MATCH (tx:Transaction)-[:BENEFITS_TO]->(a:Account)
+  WITH a,
+       count(tx) AS inflowCount,
+       sum(tx.amount) AS inflowTotal
+  WHERE inflowCount >= $minTransactionCount
+  RETURN {
+    accountNumber: a.accountNumber,
+    accountId: a.id,
+    inflowCount: inflowCount,
+    inflowTotal: inflowTotal,
+    avgInflowAmount: inflowTotal / inflowCount
+  } AS inflowConcentration
+  ORDER BY inflowTotal DESC
+  LIMIT $limit
+
+  // Find liquidity hubs (high both-way volume)
+  MATCH (a:Account)
+  OPTIONAL MATCH (a)-[:PERFORM]->(outTx:Transaction)
+  OPTIONAL MATCH (inTx:Transaction)-[:BENEFITS_TO]->(a)
+  WITH a,
+       count(DISTINCT outTx) AS outflowCount,
+       sum(DISTINCT outTx.amount) AS outflowTotal,
+       count(DISTINCT inTx) AS inflowCount,
+       sum(DISTINCT inTx.amount) AS inflowTotal
+  WHERE outflowCount >= $minTransactionCount
+    AND inflowCount >= $minTransactionCount
+  RETURN {
+    accountNumber: a.accountNumber,
+    accountId: a.id,
+    totalTransactions: outflowCount + inflowCount,
+    outflowCount: outflowCount,
+    inflowCount: inflowCount,
+    outflowTotal: outflowTotal,
+    inflowTotal: inflowTotal,
+    netPosition: inflowTotal - outflowTotal,
+    throughputRatio: CASE WHEN outflowTotal > 0
+                     THEN inflowTotal / outflowTotal
+                     ELSE 0 END
+  } AS liquidityHub
+  ORDER BY liquidityHub.totalTransactions DESC
+  LIMIT $limit
+
+reference_schema:
+  labels: [Account, Transaction]
+  relationships: [PERFORM, BENEFITS_TO]
+
+parameters:
+  - name: minTransactionCount
+    type: integer
+    default: 5
+    description: Minimum number of transactions to qualify as a concentration point
+  - name: limit
+    type: integer
+    default: 25
+    description: Maximum number of accounts to return

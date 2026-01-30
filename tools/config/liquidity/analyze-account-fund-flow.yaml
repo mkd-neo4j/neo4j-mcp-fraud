@@ -1,0 +1,76 @@
+name: analyze-account-fund-flow
+description: |
+  Analyzes inflows and outflows for an account to understand liquidity movement patterns.
+
+intent: |
+  Provide fund flow analysis for treasury management and liquidity planning:
+  - Track cash position changes over time periods
+  - Monitor inflow/outflow timing for liquidity forecasting
+  - Identify key counterparties by transaction volume
+  - Working capital analysis to understand payment and receipt cycles
+
+expected_patterns:
+  - entity: Account
+    shared_elements: [Transaction, PERFORM, BENEFITS_TO, Amount]
+    anomaly: Net cash position changes indicating liquidity stress or surplus
+  - entity: Transaction Flow
+    shared_elements: [Account, Amount]
+    anomaly: Timing gaps between inflows and outflows affecting liquidity
+  - entity: Counterparty
+    shared_elements: [Account, Bank, Merchant, Amount]
+    anomaly: Concentration risk with limited number of counterparties
+
+reference_cypher: |
+  // Fund flow summary for an account
+  MATCH (a:Account {accountNumber: $accountNumber})
+  OPTIONAL MATCH (a)-[:PERFORM]->(outTx:Transaction)-[:BENEFITS_TO]->(recipient)
+  OPTIONAL MATCH (inTx:Transaction)-[:BENEFITS_TO]->(a)
+  RETURN {
+    account: a.accountNumber,
+    outflows: { count: count(DISTINCT outTx), total: sum(DISTINCT outTx.amount) },
+    inflows: { count: count(DISTINCT inTx), total: sum(DISTINCT inTx.amount) }
+  } AS fundFlow
+
+  // Top counterparties by outflow volume
+  MATCH (a:Account {accountNumber: $accountNumber})
+  MATCH (a)-[:PERFORM]->(tx:Transaction)-[:BENEFITS_TO]->(counterparty)
+  WITH counterparty,
+       count(tx) AS txCount,
+       sum(tx.amount) AS totalAmount,
+       labels(counterparty)[0] AS counterpartyType
+  RETURN {
+    counterpartyType: counterpartyType,
+    counterpartyId: coalesce(counterparty.accountNumber, counterparty.id, counterparty.name),
+    transactionCount: txCount,
+    totalAmount: totalAmount
+  } AS counterpartySummary
+  ORDER BY totalAmount DESC
+  LIMIT $limit
+
+  // Net position calculation
+  MATCH (a:Account {accountNumber: $accountNumber})
+  OPTIONAL MATCH (a)-[:PERFORM]->(outTx:Transaction)
+  OPTIONAL MATCH (inTx:Transaction)-[:BENEFITS_TO]->(a)
+  WITH a,
+       sum(DISTINCT outTx.amount) AS totalOutflow,
+       sum(DISTINCT inTx.amount) AS totalInflow
+  RETURN {
+    accountNumber: a.accountNumber,
+    totalInflow: coalesce(totalInflow, 0),
+    totalOutflow: coalesce(totalOutflow, 0),
+    netPosition: coalesce(totalInflow, 0) - coalesce(totalOutflow, 0)
+  } AS netPosition
+
+reference_schema:
+  labels: [Account, Transaction, Customer, Bank, Merchant]
+  relationships: [PERFORM, BENEFITS_TO, HAS_ACCOUNT]
+
+parameters:
+  - name: accountNumber
+    type: string
+    required: true
+    description: The account number to analyze fund flows for
+  - name: limit
+    type: integer
+    default: 20
+    description: Maximum number of counterparties to return in breakdown
