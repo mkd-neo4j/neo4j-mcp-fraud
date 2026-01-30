@@ -24,9 +24,9 @@ func TestWalkConfigDirectory_IncludesBloomTools(t *testing.T) {
 	}
 
 	for _, config := range configs {
-		if config.Metadata.Category == "bloom" {
+		if config.Category == "bloom" {
 			bloomToolsFound[config.Name] = true
-			t.Logf("Found Bloom tool: %s (title: %s)", config.Name, config.Title)
+			t.Logf("Found Bloom tool: %s", config.Name)
 		}
 	}
 
@@ -43,7 +43,7 @@ func TestWalkConfigDirectory_IncludesBloomTools(t *testing.T) {
 	}
 }
 
-func TestBloomToolsHaveRequiredFields(t *testing.T) {
+func TestToolsHaveRequiredFields(t *testing.T) {
 	// Set the embedded FS
 	EmbeddedFS = tools.ConfigFiles
 
@@ -53,42 +53,79 @@ func TestBloomToolsHaveRequiredFields(t *testing.T) {
 		t.Fatalf("WalkConfigDirectory failed: %v", err)
 	}
 
-	// Check each Bloom tool has required fields
+	// Check each tool has required fields
 	for _, config := range configs {
-		if config.Metadata.Category != "bloom" {
-			continue
-		}
-
-		t.Logf("Validating Bloom tool: %s", config.Name)
+		t.Logf("Validating tool: %s (category: %s)", config.Name, config.Category)
 
 		// Check required fields
 		if config.Name == "" {
-			t.Errorf("Bloom tool missing name")
-		}
-		if config.Title == "" {
-			t.Errorf("Bloom tool %s missing title", config.Name)
+			t.Errorf("Tool missing name")
 		}
 		if config.Description == "" {
-			t.Errorf("Bloom tool %s missing description", config.Name)
+			t.Errorf("Tool %s missing description", config.Name)
 		}
+		if config.Category == "" {
+			t.Errorf("Tool %s missing category", config.Name)
+		}
+	}
+}
 
-		// Bloom tools should be documentation-only (no execution block or input schema)
-		if config.Execution != nil {
-			t.Errorf("Bloom tool %s should not have execution block (documentation-only)", config.Name)
-		}
-		if config.InputSchema != nil {
-			t.Errorf("Bloom tool %s should not have input schema (documentation-only)", config.Name)
-		}
+func TestValidateParameters(t *testing.T) {
+	tests := []struct {
+		name    string
+		params  []ParameterConfig
+		wantErr bool
+	}{
+		{
+			name:    "empty params is valid",
+			params:  []ParameterConfig{},
+			wantErr: false,
+		},
+		{
+			name: "valid params",
+			params: []ParameterConfig{
+				{Name: "time_window_days", Type: "integer", Default: 90},
+				{Name: "min_shared", Type: "integer", Default: 2},
+			},
+			wantErr: false,
+		},
+		{
+			name: "missing name is invalid",
+			params: []ParameterConfig{
+				{Type: "integer"},
+			},
+			wantErr: true,
+		},
+		{
+			name: "duplicate name is invalid",
+			params: []ParameterConfig{
+				{Name: "foo", Type: "string"},
+				{Name: "foo", Type: "integer"},
+			},
+			wantErr: true,
+		},
+		{
+			name: "invalid type is invalid",
+			params: []ParameterConfig{
+				{Name: "foo", Type: "invalid_type"},
+			},
+			wantErr: true,
+		},
+		{
+			name: "empty type is valid (optional)",
+			params: []ParameterConfig{
+				{Name: "foo"},
+			},
+			wantErr: false,
+		},
+	}
 
-		// Check metadata
-		if !config.Metadata.ReadOnly {
-			t.Errorf("Bloom tool %s should be readonly", config.Name)
-		}
-		if !config.Metadata.Idempotent {
-			t.Errorf("Bloom tool %s should be idempotent", config.Name)
-		}
-		if config.Metadata.Destructive {
-			t.Errorf("Bloom tool %s should not be destructive", config.Name)
-		}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			err := validateParameters(tt.params)
+			if (err != nil) != tt.wantErr {
+				t.Errorf("validateParameters() error = %v, wantErr %v", err, tt.wantErr)
+			}
+		})
 	}
 }

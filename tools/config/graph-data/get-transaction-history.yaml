@@ -1,114 +1,62 @@
 name: get-transaction-history
-title: Get Transaction History
 description: |
   Retrieves comprehensive transaction history for suspicious activity investigation and SAR filing.
 
-  This tool gathers complete transaction records for various investigation and compliance needs:
-  - **SAR Section 2.1**: What has been heard or observed (chronological transaction evidence)
-  - **SAR Section 2.2**: Nature of criminal property and quantum (total amounts, transaction sequences)
-  - **SAR Section 2.3**: Reason for suspicion (when/where/how - timeline, locations, patterns)
-  - **Fraud investigation**: Transaction patterns, velocity analysis, and anomaly detection
-  - **AML compliance**: Transaction monitoring, threshold analysis, and reporting
-  - **Regulatory reporting**: Transaction documentation for authorities
+intent: |
+  Gather complete transaction records for various investigation and compliance needs:
+  - SAR Section 2.1: Chronological transaction evidence (what has been observed)
+  - SAR Section 2.2: Nature of criminal property and quantum (total amounts)
+  - SAR Section 2.3: Reason for suspicion (when/where/how - timeline, locations, patterns)
+  - Fraud investigation: Transaction patterns, velocity analysis, anomaly detection
+  - AML compliance: Transaction monitoring, threshold analysis, reporting
 
-  The tool provides **flexible filtering** to support both broad investigations (all customer transactions)
-  and targeted queries (specific accounts, date ranges, amount thresholds).
+expected_patterns:
+  - entity: Transaction
+    shared_elements: [Account, Customer, Location, Device]
+    anomaly: Structuring - multiple transactions just below reporting thresholds
+  - entity: Transaction
+    shared_elements: [Timestamp, Amount, Account]
+    anomaly: Velocity anomalies - sudden increase in transaction frequency or unusual timing
+  - entity: Transaction
+    shared_elements: [Location, IP, Device]
+    anomaly: Geographic anomalies - transactions from inconsistent locations
+  - entity: Transaction
+    shared_elements: [Account, Amount]
+    anomaly: Round amount patterns - frequent transactions in round numbers indicating ML
+  - entity: Transaction
+    shared_elements: [Account, Timestamp]
+    anomaly: Rapid movement (layering) - funds moving quickly through multiple accounts
 
-  ---
-
-  **YOUR TASK:**
-  1. Call `get-schema` to discover the database structure
-  2. Identify transaction relationships (e.g., TRANSACTION, PAYMENT, TRANSFER, WIRE)
-  3. Identify account ownership patterns (e.g., Customer-[:OWNS]->Account)
-  4. Write a Cypher query that retrieves transaction history with counterparties
-  5. Include location data, transaction flags, and metadata for fraud detection
-  6. Handle bidirectional transactions (both outgoing and incoming)
-
-  **QUERY REQUIREMENTS:**
-
-  Your query should retrieve comprehensive transaction information:
-
-  - **Transaction details**: ID, timestamp, amount, currency, type, description, reference numbers
-    *Used for: Transaction identification, SAR documentation, evidence gathering*
-
-  - **Account information**: Source and destination accounts with account types and statuses
-    *Used for: Understanding money flow, account relationships, SAR Section 2.1*
-
-  - **Counterparty details**: Customer information for both sender and recipient
-    *Used for: Identifying other parties involved, SAR Section 2.5, relationship analysis*
-
-  - **Location data**: Geographic information (city, state, country, IP address, device info)
-    *Used for: Geographic anomaly detection, jurisdiction analysis, SAR Section 2.3 (where)*
-
-  - **Fraud indicators**: Transaction flags, risk scores, anomaly markers
-    *Used for: Pattern detection, suspicious activity identification, SAR Section 2.3 (why)*
-    *Common flags: structuring, velocity, round_amount, high_risk_jurisdiction, unusual_time, large_cash*
-
-  - **Temporal patterns**: Transaction sequences, frequency, velocity metrics
-    *Used for: Detecting structuring, smurfing, rapid movement patterns*
-
-  **FILTERING CAPABILITIES:**
-
-  The query should support flexible filtering to narrow investigation scope:
-
-  - **Entity filters**: Filter by customerId OR accountNumber (at least one required)
-  - **Date range**: Required startDate and endDate (use datetime() function)
-  - **Amount filters**: Optional minAmount and maxAmount thresholds
-  - **Transaction types**: Optional filter by transaction types (wire, ach, check, card, cash, crypto)
-  - **Direction**: Optional filter for outgoing, incoming, or both directions
-  - **Counterparty inclusion**: Option to include/exclude counterparty details
-
-  **EXAMPLE QUERY PATTERN:**
-  ```cypher
-  // Get all transactions for a customer within date range
+reference_cypher: |
   MATCH (c:Customer {customerId: $customerId})-[:OWNS]->(a:Account)
 
-  // Handle both outgoing and incoming transactions
+  // Outgoing transactions
   OPTIONAL MATCH (a)-[t_out:TRANSACTION]->(targetAcc:Account)
   WHERE t_out.timestamp >= datetime($startDate)
     AND t_out.timestamp <= datetime($endDate)
     AND ($minAmount IS NULL OR t_out.amount >= $minAmount)
     AND ($maxAmount IS NULL OR t_out.amount <= $maxAmount)
-    AND ($transactionTypes IS NULL OR t_out.type IN $transactionTypes)
   OPTIONAL MATCH (targetAcc)<-[:OWNS]-(targetCustomer:Customer)
 
+  // Incoming transactions
   OPTIONAL MATCH (sourceAcc:Account)-[t_in:TRANSACTION]->(a)
   WHERE t_in.timestamp >= datetime($startDate)
     AND t_in.timestamp <= datetime($endDate)
     AND ($minAmount IS NULL OR t_in.amount >= $minAmount)
     AND ($maxAmount IS NULL OR t_in.amount <= $maxAmount)
-    AND ($transactionTypes IS NULL OR t_in.type IN $transactionTypes)
   OPTIONAL MATCH (sourceAcc)<-[:OWNS]-(sourceCustomer:Customer)
 
-  // Combine outgoing and incoming transactions
+  // Combine and return
   WITH collect(DISTINCT {
     transactionId: t_out.transactionId,
     timestamp: t_out.timestamp,
     amount: t_out.amount,
     currency: t_out.currency,
     type: t_out.type,
-    description: t_out.description,
-    reference: t_out.reference,
     direction: 'outgoing',
-    fromAccount: {
-      accountNumber: a.accountNumber,
-      accountType: a.accountType,
-      customerId: c.customerId,
-      customerName: c.firstName + ' ' + c.lastName
-    },
-    toAccount: {
-      accountNumber: targetAcc.accountNumber,
-      accountType: targetAcc.accountType,
-      customerId: targetCustomer.customerId,
-      customerName: targetCustomer.firstName + ' ' + targetCustomer.lastName
-    },
-    location: {
-      city: t_out.city,
-      state: t_out.state,
-      country: t_out.country,
-      ipAddress: t_out.ipAddress,
-      deviceId: t_out.deviceId
-    },
+    fromAccount: a.accountNumber,
+    toAccount: targetAcc.accountNumber,
+    counterparty: targetCustomer.customerId,
     flags: t_out.flags,
     riskScore: t_out.riskScore
   }) + collect(DISTINCT {
@@ -117,251 +65,44 @@ description: |
     amount: t_in.amount,
     currency: t_in.currency,
     type: t_in.type,
-    description: t_in.description,
-    reference: t_in.reference,
     direction: 'incoming',
-    fromAccount: {
-      accountNumber: sourceAcc.accountNumber,
-      accountType: sourceAcc.accountType,
-      customerId: sourceCustomer.customerId,
-      customerName: sourceCustomer.firstName + ' ' + sourceCustomer.lastName
-    },
-    toAccount: {
-      accountNumber: a.accountNumber,
-      accountType: a.accountType,
-      customerId: c.customerId,
-      customerName: c.firstName + ' ' + c.lastName
-    },
-    location: {
-      city: t_in.city,
-      state: t_in.state,
-      country: t_in.country,
-      ipAddress: t_in.ipAddress,
-      deviceId: t_in.deviceId
-    },
+    fromAccount: sourceAcc.accountNumber,
+    toAccount: a.accountNumber,
+    counterparty: sourceCustomer.customerId,
     flags: t_in.flags,
     riskScore: t_in.riskScore
-  }) AS allTransactions
+  }) AS transactions
 
-  // Filter out null entries and sort
-  UNWIND allTransactions AS tx
+  UNWIND transactions AS tx
   WHERE tx.transactionId IS NOT NULL
+  RETURN collect(tx) AS transactions
+  ORDER BY tx.timestamp DESC
 
-  WITH collect(tx) AS transactions
+reference_schema:
+  labels: [Customer, Account, Transaction]
+  relationships: [OWNS, TRANSACTION, PAYMENT, TRANSFER, WIRE]
 
-  // Calculate summary statistics
-  RETURN {
-    summary: {
-      totalTransactions: size(transactions),
-      totalAmount: reduce(sum = 0.0, tx IN transactions | sum + tx.amount),
-      dateRange: {
-        start: $startDate,
-        end: $endDate
-      },
-      outgoingCount: size([tx IN transactions WHERE tx.direction = 'outgoing']),
-      incomingCount: size([tx IN transactions WHERE tx.direction = 'incoming']),
-      outgoingAmount: reduce(sum = 0.0, tx IN transactions WHERE tx.direction = 'outgoing' | sum + tx.amount),
-      incomingAmount: reduce(sum = 0.0, tx IN transactions WHERE tx.direction = 'incoming' | sum + tx.amount),
-      uniqueAccounts: size(apoc.coll.toSet(
-        [tx IN transactions | tx.fromAccount.accountNumber] +
-        [tx IN transactions | tx.toAccount.accountNumber]
-      )),
-      uniqueCounterparties: size(apoc.coll.toSet(
-        [tx IN transactions WHERE tx.direction = 'outgoing' | tx.toAccount.customerId] +
-        [tx IN transactions WHERE tx.direction = 'incoming' | tx.fromAccount.customerId]
-      )),
-      flaggedTransactions: size([tx IN transactions WHERE size(coalesce(tx.flags, [])) > 0])
-    },
-    transactions: [tx IN transactions | tx ORDER BY tx.timestamp DESC]
-  } AS result
-  ```
-
-  **ALTERNATIVE: Query by Account Number**
-  If filtering by accountNumber instead of customerId:
-  ```cypher
-  MATCH (a:Account {accountNumber: $accountNumber})
-  OPTIONAL MATCH (a)<-[:OWNS]-(c:Customer)
-  // ... rest of query similar to above
-  ```
-
-  **QUERY PARAMETERS:**
-  - `$customerId` (optional) - Customer ID to retrieve transactions for
-  - `$accountNumber` (optional) - Account number to retrieve transactions for
-  - `$startDate` (required) - Start of date range (ISO 8601 format)
-  - `$endDate` (required) - End of date range (ISO 8601 format)
-  - `$minAmount` (optional) - Minimum transaction amount
-  - `$maxAmount` (optional) - Maximum transaction amount
-  - `$transactionTypes` (optional) - Array of transaction types to include
-  - `$includeCounterparties` (optional, default: true) - Include counterparty customer details
-  - `$sortBy` (optional, default: "timestamp") - Sort field: timestamp | amount | riskScore
-
-  **Note**: At least one of `$customerId` or `$accountNumber` must be provided.
-
-  ---
-
-  **SAR MAPPING AND USAGE:**
-
-  **SAR Section 2.1 - What has been heard or observed:**
-  Use transaction history to document:
-  - Chronological sequence of suspicious transactions
-  - Transaction patterns and sequences
-  - Observable facts about money movement
-
-  **SAR Section 2.2 - Nature of criminal property and quantum:**
-  Use summary statistics to document:
-  - Total suspicious amounts (inflows, outflows, net)
-  - Currency types involved
-  - Property description (cash, wire transfers, cryptocurrency)
-
-  **SAR Section 2.3 - Reason for suspicion (5 W's):**
-  - **When**: Transaction timestamps and date patterns
-  - **Where**: Transaction locations (city, state, country, IP addresses)
-  - **How**: Transaction types and methods (wire, ACH, cash, card)
-  - **What**: Specific transaction details and descriptions
-  - **Why**: Transaction flags and risk indicators
-
-  **Example SAR Narrative from Transaction History:**
-  ```
-  Between January 1, 2024 and March 31, 2024, Customer C12345 conducted 47 transactions
-  totaling $458,923.45 through Account ****1234. The transactions included:
-
-  - 23 outgoing wire transfers totaling $389,450.00 to high-risk jurisdictions
-  - 12 incoming ACH deposits totaling $69,473.45 from multiple sources
-  - 8 transactions flagged for structuring (amounts just below $10,000 threshold)
-  - 4 transactions flagged for unusual timing (late night/early morning)
-
-  Geographic analysis revealed transactions originating from 7 different states
-  despite customer's registered address in California, indicating potential
-  account takeover or identity fraud.
-  ```
-
-  ---
-
-  **FRAUD PATTERN DETECTION:**
-
-  Common patterns to identify in transaction history:
-
-  **Structuring (Smurfing):**
-  - Multiple transactions just below reporting thresholds ($10,000 CTR, $3,000 for money orders)
-  - Flag: "structuring" or "threshold_avoidance"
-
-  **Velocity Anomalies:**
-  - Sudden increase in transaction frequency
-  - Unusual transaction times (late night, holidays)
-  - Flag: "velocity" or "unusual_timing"
-
-  **Round Amount Patterns:**
-  - Frequent transactions in round numbers ($5,000, $10,000, $25,000)
-  - May indicate predetermined amounts for money laundering
-  - Flag: "round_amount"
-
-  **Geographic Anomalies:**
-  - Transactions from locations inconsistent with customer profile
-  - Multiple countries in short time period (impossible travel)
-  - High-risk jurisdictions (FATF blacklist countries)
-  - Flag: "geographic_anomaly" or "high_risk_jurisdiction"
-
-  **Rapid Movement (Layering):**
-  - Funds moving quickly through multiple accounts
-  - Complex chains of transactions to obscure origin
-  - Flag: "rapid_movement" or "layering"
-
-  **Circular Flows:**
-  - Money returning to original source after passing through accounts
-  - Flag: "circular_flow"
-
-  ---
-
-  **OUTPUT STRUCTURE:**
-
-  Returns a structured object with two main sections:
-
-  **summary**: Aggregated metrics for quick analysis
-  - `totalTransactions`: Count of all transactions
-  - `totalAmount`: Sum of all transaction amounts
-  - `dateRange`: Query date range
-  - `outgoingCount`: Number of outgoing transactions
-  - `incomingCount`: Number of incoming transactions
-  - `outgoingAmount`: Total amount sent
-  - `incomingAmount`: Total amount received
-  - `uniqueAccounts`: Number of distinct accounts involved
-  - `uniqueCounterparties`: Number of distinct counterparty customers
-  - `flaggedTransactions`: Count of transactions with fraud flags
-
-  **transactions**: Array of transaction objects (sorted by timestamp DESC)
-  Each transaction includes:
-  - `transactionId`: Unique transaction identifier
-  - `timestamp`: Transaction date and time
-  - `amount`: Transaction amount
-  - `currency`: Currency code (USD, EUR, GBP, etc.)
-  - `type`: Transaction type (wire, ach, check, card, cash, crypto)
-  - `description`: Transaction description or memo
-  - `reference`: External reference number
-  - `direction`: "outgoing" or "incoming" (relative to subject account)
-  - `fromAccount`: Source account details with customer information
-  - `toAccount`: Destination account details with customer information
-  - `location`: Geographic and device information
-  - `flags`: Array of fraud indicators
-  - `riskScore`: Calculated risk score (if available)
-
-  ---
-
-  **USE CASES:**
-
-  **Fraud Investigation:**
-  - Gather evidence for suspicious activity investigation
-  - Document transaction patterns for case files
-  - Identify related parties through transaction counterparties
-
-  **SAR Preparation:**
-  - Complete SAR Section 2.1 (chronological evidence)
-  - Calculate quantum for SAR Section 2.2
-  - Document 5 W's for SAR Section 2.3
-
-  **AML Monitoring:**
-  - Review customer transaction history for compliance
-  - Identify threshold violations and reporting requirements
-  - Document due diligence investigations
-
-  **Pattern Detection:**
-  - Identify structuring, layering, and other ML patterns
-  - Detect velocity anomalies and behavioral changes
-  - Flag geographic inconsistencies
-
-  **Regulatory Reporting:**
-  - Gather transaction documentation for regulators
-  - Support audit requests and examinations
-  - Provide evidence for law enforcement requests
-
-  ---
-
-  **IMPORTANT NOTES:**
-
-  - Use OPTIONAL MATCH for transaction relationships to handle missing data
-  - Handle both outgoing and incoming transactions for complete picture
-  - Filter out null transactions before returning results
-  - Sort by timestamp DESC to show most recent transactions first
-  - Include direction field to distinguish outgoing vs. incoming
-  - Collect counterparty information for SAR Section 2.5 (other parties)
-  - Adapt the query to your schema's transaction relationship types
-  - If your schema uses different relationship types (PAYMENT, TRANSFER, WIRE), adjust accordingly
-  - Consider performance: for large transaction volumes, add LIMIT or pagination
-  - Transaction flags should be stored as arrays in your database for flexible detection
-
-  **PERFORMANCE CONSIDERATIONS:**
-
-  For databases with high transaction volumes:
-  - Add LIMIT clause to cap results (e.g., LIMIT 1000)
-  - Use indexed properties for filtering (timestamp, customerId, accountNumber)
-  - Consider pagination parameters (offset, limit)
-  - For very large date ranges, break into smaller chunks
-
-execution:
-  mode: read
-  timeout: 30000
-
-metadata:
-  readonly: true
-  idempotent: true
-  destructive: false
-  category: sar
+parameters:
+  - name: customerId
+    type: string
+    description: Customer ID to retrieve transactions for (or use accountNumber)
+  - name: accountNumber
+    type: string
+    description: Account number to retrieve transactions for (or use customerId)
+  - name: startDate
+    type: string
+    required: true
+    description: Start of date range (ISO 8601 format)
+  - name: endDate
+    type: string
+    required: true
+    description: End of date range (ISO 8601 format)
+  - name: minAmount
+    type: number
+    description: Minimum transaction amount filter
+  - name: maxAmount
+    type: number
+    description: Maximum transaction amount filter
+  - name: transactionTypes
+    type: array
+    description: Array of transaction types to include (wire, ach, check, card, cash, crypto)

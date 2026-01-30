@@ -1,0 +1,71 @@
+name: detect-transaction-ring
+description: |
+  Detects transaction fraud rings - circular patterns where funds flow through
+  multiple accounts and return to the originating account.
+
+intent: |
+  Detect transaction fraud rings where a group of people collaborate to engage
+  in fraudulent activities by transferring funds through multiple accounts in
+  a circular pattern.
+
+  Transaction rings are identified by finding paths that:
+  - Start and end at the same account (circular flow)
+  - Pass through unique intermediate accounts
+  - Follow chronological order
+  - Maintain consistent amounts (with small deductions for fees/laundering)
+
+expected_patterns:
+  - entity: Account
+    shared_elements: [Transaction, PERFORMS, BENEFITS_TO]
+    anomaly: Circular transaction path returning to originating account
+  - entity: Transaction Chain
+    shared_elements: [Account, Amount, Date]
+    anomaly: Sequential transactions with consistent amounts and chronological ordering
+
+reference_cypher: |
+  // Simple ring detection (Neo4j 5.9+ quantified path patterns)
+  MATCH path=(a:Account)(()-[:PERFORMS]->()-[:BENEFITS_TO]->()){3,6}(a)
+  RETURN path
+
+  // Unique accounts validation
+  MATCH path=(a:Account)((a_i)-[:PERFORMS]->(tx)-[:BENEFITS_TO]->(a_j)){3,6}(a)
+  WHERE size(apoc.coll.toSet(a_i)) = size(a_i)
+  RETURN path
+
+  // Chronological order validation
+  MATCH path=(a:Account)-[:PERFORMS]->(first_tx)
+  ((tx_i)-[:BENEFITS_TO]->(a_i)-[:PERFORMS]->(tx_j)
+  WHERE tx_i.date < tx_j.date)*
+  (last_tx)-[:BENEFITS_TO]->(a)
+  WHERE size(apoc.coll.toSet([a]+a_i)) = size([a]+a_i)
+  RETURN path
+
+  // Full validation with amount ratio (0.80-1.00 allows 20% reduction)
+  MATCH path=(a:Account)-[:PERFORMS]->(first_tx)
+  ((tx_i)-[:BENEFITS_TO]->(a_i)-[:PERFORMS]->(tx_j)
+  WHERE tx_i.date < tx_j.date
+  AND $minAmountRatio <= tx_i.amount / tx_j.amount <= 1.00)*
+  (last_tx)-[:BENEFITS_TO]->(a)
+  WHERE size(apoc.coll.toSet([a]+a_i)) = size([a]+a_i)
+  RETURN path
+
+reference_schema:
+  labels: [Account, Transaction]
+  relationships: [PERFORMS, BENEFITS_TO]
+
+parameters:
+  - name: minRingLength
+    type: integer
+    default: 3
+    description: Minimum number of transactions in a ring
+  - name: maxRingLength
+    type: integer
+    default: 6
+    description: Maximum number of transactions in a ring
+  - name: minAmountRatio
+    type: number
+    default: 0.80
+    description: Minimum ratio between consecutive transaction amounts (0.80 allows up to 20% reduction)
+  - name: accountNumber
+    type: string
+    description: Optional - specific account to investigate (omit for discovery mode)

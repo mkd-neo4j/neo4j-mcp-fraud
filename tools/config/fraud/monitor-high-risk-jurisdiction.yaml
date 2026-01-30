@@ -1,0 +1,75 @@
+name: monitor-high-risk-jurisdiction
+description: |
+  Monitors transactions directed towards regions or countries categorised as
+  high-risk for financial misconduct to identify potential money mule activity.
+
+intent: |
+  Detect potential money mule patterns where funds flow from an external source
+  through an internal account and then out to a high-risk jurisdiction.
+
+  This rule identifies suspicious activity by finding:
+  - Inflow from external account to internal account
+  - Outflow from internal account to high-risk jurisdiction
+  - Outflow amount is 90-110% of inflow (pass-through with small fees)
+  - Both transactions occur within rolling 30-day window
+
+expected_patterns:
+  - entity: Account
+    shared_elements: [Transaction, Internal, External, HighRiskJurisdiction]
+    anomaly: Internal account receiving funds and forwarding to high-risk jurisdiction
+  - entity: Transaction Chain
+    shared_elements: [Amount, Date, Account]
+    anomaly: Pass-through pattern where outflow is 90-110% of inflow within 30 days
+
+reference_cypher: |
+  // Find money mule patterns to high-risk jurisdictions
+  MATCH (ext:Account:External)-[:PERFORMS]->(inflow:Transaction)-[:BENEFITS_TO]->(internal:Account:Internal)
+  MATCH (internal)-[:PERFORMS]->(outflow:Transaction)-[:BENEFITS_TO]->(hrj:Account:HighRiskJurisdiction)
+  WHERE outflow.date >= inflow.date
+    AND outflow.date <= inflow.date + duration({days: $timeWindowDays})
+    AND outflow.amount >= inflow.amount * $minAmountRatio
+    AND outflow.amount <= inflow.amount * $maxAmountRatio
+  RETURN ext, inflow, internal, outflow, hrj,
+         inflow.amount AS inflowAmount,
+         outflow.amount AS outflowAmount,
+         outflow.amount / inflow.amount AS amountRatio
+
+  // Discovery mode: Find all high-risk jurisdiction transactions
+  MATCH (a:Account)-[:PERFORMS]->(t:Transaction)-[:BENEFITS_TO]->(hrj:Account:HighRiskJurisdiction)
+  WHERE t.date >= datetime() - duration({days: $timeWindowDays})
+  RETURN a, t, hrj
+  ORDER BY t.amount DESC
+  LIMIT $limit
+
+  // Investigation mode: Check specific account for high-risk patterns
+  MATCH (internal:Account {accountNumber: $accountNumber})
+  MATCH (ext:Account)-[:PERFORMS]->(inflow:Transaction)-[:BENEFITS_TO]->(internal)
+  MATCH (internal)-[:PERFORMS]->(outflow:Transaction)-[:BENEFITS_TO]->(hrj:Account:HighRiskJurisdiction)
+  WHERE outflow.date >= inflow.date
+    AND outflow.date <= inflow.date + duration({days: $timeWindowDays})
+  RETURN ext, inflow, internal, outflow, hrj
+
+reference_schema:
+  labels: [Account, Internal, External, HighRiskJurisdiction, Transaction]
+  relationships: [PERFORMS, BENEFITS_TO]
+
+parameters:
+  - name: timeWindowDays
+    type: integer
+    default: 30
+    description: Rolling time window in days for detecting pass-through transactions
+  - name: minAmountRatio
+    type: number
+    default: 0.90
+    description: Minimum ratio of outflow to inflow amount (0.90 = 90%)
+  - name: maxAmountRatio
+    type: number
+    default: 1.10
+    description: Maximum ratio of outflow to inflow amount (1.10 = 110%)
+  - name: limit
+    type: integer
+    default: 50
+    description: Maximum number of results to return in discovery mode
+  - name: accountNumber
+    type: string
+    description: Optional - specific account to investigate (omit for discovery mode)

@@ -71,7 +71,7 @@ func walkEmbeddedConfigs() ([]*ToolConfig, error) {
 		}
 
 		configs = append(configs, config)
-		slog.Info("loaded tool config from embedded FS", "tool", config.Name, "category", config.Metadata.Category, "path", path)
+		slog.Info("loaded tool config from embedded FS", "tool", config.Name, "category", config.Category, "path", path)
 
 		return nil
 	})
@@ -127,7 +127,7 @@ func walkOSFilesystem(configDir string) ([]*ToolConfig, error) {
 		}
 
 		configs = append(configs, config)
-		slog.Info("loaded tool config from filesystem", "tool", config.Name, "category", config.Metadata.Category, "path", path)
+		slog.Info("loaded tool config from filesystem", "tool", config.Name, "category", config.Category, "path", path)
 
 		return nil
 	})
@@ -148,34 +148,49 @@ func parseToolConfig(data []byte, path string) (*ToolConfig, error) {
 	}
 
 	// Derive category from directory structure
-	category := deriveCategoryFromPath(path)
-	config.Metadata.Category = category
+	config.Category = deriveCategoryFromPath(path)
 
 	// Validate required fields
 	if config.Name == "" {
 		return nil, fmt.Errorf("tool name is required in config file: %s", path)
 	}
 
-	if config.Title == "" {
-		return nil, fmt.Errorf("tool title is required in config file: %s", path)
-	}
-
 	if config.Description == "" {
 		return nil, fmt.Errorf("tool description is required in config file: %s", path)
 	}
 
-	// If execution block exists, validate it
-	if config.Execution != nil {
-		if config.Execution.Mode == "" {
-			return nil, fmt.Errorf("execution mode is required when execution block is present in config file: %s", path)
-		}
-
-		if config.Execution.Mode != "read" && config.Execution.Mode != "write" {
-			return nil, fmt.Errorf("execution mode must be 'read' or 'write' in config file: %s", path)
-		}
+	// Validate parameters if present
+	if err := validateParameters(config.Parameters); err != nil {
+		return nil, fmt.Errorf("invalid parameters in %s: %w", path, err)
 	}
 
 	return &config, nil
+}
+
+// validateParameters validates parameter definitions
+func validateParameters(params []ParameterConfig) error {
+	validTypes := map[string]bool{
+		"string": true, "integer": true, "number": true,
+		"boolean": true, "array": true, "object": true,
+	}
+	names := make(map[string]bool)
+
+	for i, param := range params {
+		if param.Name == "" {
+			return fmt.Errorf("parameter[%d] name is required", i)
+		}
+
+		if names[param.Name] {
+			return fmt.Errorf("duplicate parameter name '%s'", param.Name)
+		}
+		names[param.Name] = true
+
+		if param.Type != "" && !validTypes[param.Type] {
+			return fmt.Errorf("parameter '%s' has invalid type '%s'", param.Name, param.Type)
+		}
+	}
+
+	return nil
 }
 
 // deriveCategoryFromPath extracts the category from the file path

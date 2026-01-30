@@ -60,19 +60,21 @@ func (r *ToolRegistry) GetServerTools(deps *tools.ToolDependencies) []server.Ser
 
 // buildServerTool creates an MCP server tool from a tool config
 func (r *ToolRegistry) buildServerTool(config *ToolConfig, deps *tools.ToolDependencies) server.ServerTool {
+	// Build enriched description from semantic fields
+	description := buildEnrichedDescription(config)
+
 	// Create the MCP tool specification
-	// We use DynamicToolInput as the input schema type for all dynamic tools
+	// All config-based tools are guidance tools (readonly, idempotent, non-destructive)
 	mcpTool := mcp.NewTool(config.Name,
-		mcp.WithDescription(config.Description),
-		mcp.WithInputSchema[DynamicToolInput](),
-		mcp.WithTitleAnnotation(config.Title),
-		mcp.WithReadOnlyHintAnnotation(config.Metadata.ReadOnly),
-		mcp.WithDestructiveHintAnnotation(config.Metadata.Destructive),
-		mcp.WithIdempotentHintAnnotation(config.Metadata.Idempotent),
+		mcp.WithDescription(description),
+		mcp.WithTitleAnnotation(config.Name), // Use name as title
+		mcp.WithReadOnlyHintAnnotation(true),
+		mcp.WithDestructiveHintAnnotation(false),
+		mcp.WithIdempotentHintAnnotation(true),
 		mcp.WithOpenWorldHintAnnotation(true),
 	)
 
-	slog.Debug("built dynamic tool", "name", config.Name, "category", config.Metadata.Category)
+	slog.Debug("built dynamic tool", "name", config.Name, "category", config.Category)
 
 	// Create the handler
 	handler := NewDynamicHandler(config, deps)
@@ -87,7 +89,7 @@ func (r *ToolRegistry) buildServerTool(config *ToolConfig, deps *tools.ToolDepen
 func (r *ToolRegistry) GetCategory(toolName string) string {
 	for _, config := range r.configs {
 		if config.Name == toolName {
-			return config.Metadata.Category
+			return config.Category
 		}
 	}
 	return "unknown"
@@ -97,7 +99,7 @@ func (r *ToolRegistry) GetCategory(toolName string) string {
 func (r *ToolRegistry) GetToolsByCategory(category string) []*ToolConfig {
 	tools := make([]*ToolConfig, 0)
 	for _, config := range r.configs {
-		if config.Metadata.Category == category {
+		if config.Category == category {
 			tools = append(tools, config)
 		}
 	}
@@ -108,7 +110,7 @@ func (r *ToolRegistry) GetToolsByCategory(category string) []*ToolConfig {
 func (r *ToolRegistry) ListCategories() []string {
 	categoryMap := make(map[string]bool)
 	for _, config := range r.configs {
-		categoryMap[config.Metadata.Category] = true
+		categoryMap[config.Category] = true
 	}
 
 	categories := make([]string, 0, len(categoryMap))

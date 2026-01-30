@@ -1,80 +1,58 @@
 name: detect-synthetic-identity
-title: Detect Synthetic Identity Fraud
 description: |
-  Detects synthetic identity fraud by identifying entities sharing identity attributes (PII).
-  Synthetic identity theft involves combining real and fake identity information to create
-  "Frankenstein identities" for fraudulent account opening or purchases.
+  Identifies potential synthetic identities by finding clusters of
+  identities sharing PII elements without legitimate relationship explanation.
 
-  **WHAT IS SYNTHETIC IDENTITY FRAUD:**
-  Fraudsters steal real information (photos, passport numbers, SSNs) and combine them with
-  fabricated details to create synthetic identities. Detection uses Neo4j's graph link analysis -
-  exploring connections between identities and analyzing suspicious relationship patterns.
+intent: |
+  Detect synthetic identity fraud where a person combines real and fake identity
+  information to open accounts or make purchases - using real information (photos,
+  passport numbers) mixed with fake information (fake name, address, date of birth).
 
-  **NEO4J DETECTION APPROACH:**
-  - Use graph-based pattern recognition to analyze data shapes, not just raw data
-  - Perform real-time link analysis without predefined starting points
-  - Identify suspicious clusters through shared identity attributes
-  - Leverage Weakly Connected Components (WCC) for community detection
-  - Generate near real-time alerts on suspicious patterns
+  Detection uses Neo4j's graph link analysis - exploring connections among identities
+  to identify synthetic clusters and suspicious relationship patterns.
 
-  **YOUR TASK:**
-  1. First, call `get-schema` to discover the database structure
-  2. Identify the entity node type to search (e.g., Customer, Person, Account, Merchant)
-  3. Analyze the PII relationships (e.g., HAS_EMAIL, HAS_PHONE, HAS_SSN, HAS_ADDRESS, HAS_PASSPORT, HAS_DRIVER_LICENSE)
-  4. Write a Cypher query using Neo4j graph patterns to find entities sharing identity attributes
+expected_patterns:
+  - entity: Customer
+    shared_elements: [Email, Phone, Passport]
+    anomaly: Multiple customers sharing the same email, phone, or passport without legitimate relationship
+  - entity: Customer PII Community
+    shared_elements: [Email, Phone, Passport]
+    anomaly: Connected component of customers linked through shared attributes - use GDS WCC algorithm
 
-  **MODES OF OPERATION:**
-
-  **Mode 1 - Discovery Mode (find all suspicious clusters):**
-  Discovers clusters of entities sharing PII across the database. Use this to proactively find
-  fraud patterns by analyzing interrelationships between data points.
-
-  **Simple Pattern - Find entities sharing a single piece of PII:**
-  ```cypher
-  // Match all customers sharing an email
-  MATCH path=(c1:Customer)-[:HAS_EMAIL]->(email)<-[:HAS_EMAIL]-(c2:Customer)
+reference_cypher: |
+  // Customers sharing email
+  MATCH path=(c1:Customer)-[:HAS_EMAIL]->(:Email)<-[:HAS_EMAIL]-(c2:Customer)
   RETURN path
-  ```
-  
-  **Simple Pattern - Find entities sharing any PII:**
-  ```cypher
-  // Match all customers sharing an email, phone or passport number
+
+  // Multiple shared characteristics
   MATCH path=(c1:Customer)-[:HAS_EMAIL|HAS_PHONE|HAS_PASSPORT]->(info)<-[:HAS_EMAIL|HAS_PHONE|HAS_PASSPORT]-(c2:Customer)
   RETURN path
-  ```
 
-  **FRAUD INDICATORS (Risk Thresholds):**
-  - CRITICAL: Multiple entities sharing 3+ identity attributes (likely organized fraud ring or synthetic identity network)
-  - HIGH RISK: Multiple entities sharing 2+ identity attributes (classic synthetic identity pattern)
-  - MEDIUM RISK: Shared single identity attribute (may be legitimate family/business, requires investigation)
+  // Create monopartite relationships for GDS
+  MATCH (c1:Customer)-[:HAS_EMAIL|HAS_PHONE|HAS_PASSPORT]->(info)<-[:HAS_EMAIL|HAS_PHONE|HAS_PASSPORT]-(c2:Customer)
+  WHERE ID(c1) > ID(c2)
+  CREATE (c1)-[:LINKED]->(c2)
 
-  **DETECTION BEST PRACTICES:**
-  - Continuously process data for near real-time fraud detection
-  - Use graph algorithms (WCC) to identify fraud communities
-  - Analyze connection patterns and suspicious clusters
-  - Look for unusual overlapping of identity documents (emails, phones, passports)
-  - Establish LINKED relationships between potentially fraudulent nodes for investigation
+  // GDS: Project graph and run WCC
+  CALL gds.graph.project('myGraph', 'Customer', 'LINKED')
+  CALL gds.wcc.stream('myGraph')
+  YIELD nodeId, componentId
+  RETURN gds.util.asNode(nodeId).customerId AS customerId, componentId
+  ORDER BY componentId
 
-  **QUERY PARAMETERS:**
-  Your query should support these parameters (use defaults if not provided):
-  - `$entityId` (optional) - Specific entity ID to investigate (omit for discovery mode)
-  - `$minSharedAttributes` (default: 2) - Minimum number of shared attributes to flag (Neo4j recommended threshold)
-  - `$limit` (default: 20) - Maximum number of results to return
+reference_schema:
+  labels: [Customer, Email, Phone, Passport]
+  relationships: [HAS_EMAIL, HAS_PHONE, HAS_PASSPORT, LINKED]
 
-  **IMPORTANT:**
-  - Use OPTIONAL MATCH for PII relationships to handle missing data gracefully
-  - Use id(e1) < id(e2) in discovery mode to avoid duplicate pairs
-  - Collect shared attributes with type and value for clear reporting
-  - Filter by minSharedAttributes threshold before returning results
-  - Return entity display properties (customerId, firstName, lastName, etc.)
-  - Consider using WCC algorithm for large-scale community detection of fraud rings
-
-execution:
-  mode: read
-  timeout: 30000
-
-metadata:
-  readonly: true
-  idempotent: true
-  destructive: false
-  category: fraud
+parameters:
+  - name: minSharedAttributes
+    type: integer
+    default: 2
+    description: Minimum number of shared attributes to flag as suspicious
+  - name: limit
+    type: integer
+    default: 20
+    description: Maximum number of results to return
+  - name: customerId
+    type: string
+    description: Optional - specific customer ID to investigate (omit for discovery mode)

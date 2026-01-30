@@ -1,5 +1,4 @@
 name: get-sar-report-guidance
-title: Get SAR Report Guidance
 description: |
   # SUSPICIOUS ACTIVITY REPORT (SAR) FILING GUIDANCE
 
@@ -68,27 +67,27 @@ description: |
   **Critical Elements of a Strong Narrative:**
 
   1. **The Five W's:**
-    - WHO: Subjects involved (include all parties)
-    - WHAT: Specific suspicious activities observed
-    - WHEN: Timeline of suspicious activities
-    - WHERE: Location(s) of activities
-    - WHY: Why the activity is suspicious
+     - WHO: Subjects involved (include all parties)
+     - WHAT: Specific suspicious activities observed
+     - WHEN: Timeline of suspicious activities
+     - WHERE: Location(s) of activities
+     - WHY: Why the activity is suspicious
 
   2. **Narrative Structure:**
-    - [OPENING] Summary of suspicious activity and total dollar amounts
-    - [BACKGROUND] Customer relationship history and account details
-    - [SUSPICIOUS ACTIVITY] Detailed chronological description of red flags
-    - [INVESTIGATION] Internal investigation findings and evidence
-    - [CONCLUSION] Basis for suspicion and any actions taken
+     - [OPENING] Summary of suspicious activity and total dollar amounts
+     - [BACKGROUND] Customer relationship history and account details
+     - [SUSPICIOUS ACTIVITY] Detailed chronological description of red flags
+     - [INVESTIGATION] Internal investigation findings and evidence
+     - [CONCLUSION] Basis for suspicion and any actions taken
 
   3. **Key Details to Include:**
-    - Unusual patterns or deviations from expected behavior
-    - Red flags or indicators of fraud/money laundering
-    - Relationship connections to other suspicious parties
-    - Failed identity verification attempts
-    - Geographic anomalies
-    - Transaction velocity or volume changes
-    - Source of funds inconsistencies
+     - Unusual patterns or deviations from expected behavior
+     - Red flags or indicators of fraud/money laundering
+     - Relationship connections to other suspicious parties
+     - Failed identity verification attempts
+     - Geographic anomalies
+     - Transaction velocity or volume changes
+     - Source of funds inconsistencies
 
   ---
 
@@ -325,8 +324,30 @@ description: |
 
   **Note**: This guidance is for reference purposes. Always consult your institution's BSA/AML compliance officer and legal counsel before filing a SAR. Regulations may change, so verify current requirements with FinCEN.
 
-metadata:
-  readonly: true
-  idempotent: true
-  destructive: false
-  category: sar
+intent: |
+  Provide comprehensive guidance for filing Suspicious Activity Reports (SARs) with FinCEN,
+  including regulatory requirements, narrative writing best practices, and Neo4j queries
+  for gathering evidence.
+
+expected_patterns:
+  - entity: SAR Filing
+    shared_elements: [Subject, Transaction, Timeline, Location]
+    anomaly: Suspicious activity requiring regulatory reporting
+  - entity: Narrative
+    shared_elements: [Who, What, When, Where, Why]
+    anomaly: Red flags indicating fraud, money laundering, or other financial crimes
+
+reference_schema:
+  labels: [Customer, Account, Transaction, Email, Phone, SSN, Address, DriverLicense, Alert, Case]
+  relationships: [OWNS, HAS_EMAIL, HAS_PHONE, HAS_SSN, HAS_ADDRESS, HAS_DRIVER_LICENSE, TRANSACTION, SUBJECT_OF]
+
+parameters:
+  - name: customerId
+    type: string
+    description: Customer ID of the SAR subject
+  - name: startDate
+    type: string
+    description: Start date for suspicious activity period (ISO 8601)
+  - name: endDate
+    type: string
+    description: End date for suspicious activity period (ISO 8601)

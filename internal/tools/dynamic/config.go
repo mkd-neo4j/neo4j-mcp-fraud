@@ -5,60 +5,64 @@ type ToolConfig struct {
 	// Name is the unique tool identifier (e.g., "detect-synthetic-identity")
 	Name string `yaml:"name"`
 
-	// Title is the human-readable tool name
-	Title string `yaml:"title"`
-
-	// Description provides detailed guidance for LLMs on how to use this tool
+	// Description provides the operational description of the tool
 	Description string `yaml:"description"`
 
-	// InputSchema defines the JSON schema for tool inputs (optional for documentation tools)
-	InputSchema *InputSchemaConfig `yaml:"input_schema,omitempty"`
+	// Intent provides semantic understanding for agents - WHEN to use this tool
+	Intent string `yaml:"intent,omitempty"`
 
-	// Execution defines how the query should be executed (optional for documentation tools)
-	Execution *ExecutionConfig `yaml:"execution,omitempty"`
+	// ExpectedPatterns describes the patterns this tool helps detect
+	ExpectedPatterns []PatternConfig `yaml:"expected_patterns,omitempty"`
 
-	// Metadata contains tool categorization and behavior flags
-	Metadata MetadataConfig `yaml:"metadata"`
+	// ReferenceCypher provides canonical query implementation as guidance for the LLM
+	ReferenceCypher string `yaml:"reference_cypher,omitempty"`
 
-	// StaticContent is the hardcoded content to return (for documentation tools)
-	StaticContent string `yaml:"static_content,omitempty"`
+	// ReferenceSchema provides hints about common labels/relationships to look for
+	ReferenceSchema *ReferenceSchemaConfig `yaml:"reference_schema,omitempty"`
+
+	// Parameters defines typed input parameters for the query
+	Parameters []ParameterConfig `yaml:"parameters,omitempty"`
+
+	// Category is derived from the folder structure (e.g., "fraud", "graph-data")
+	// This is an internal field, not from YAML
+	Category string `yaml:"-"`
 }
 
-// InputSchemaConfig defines the JSON schema structure for tool inputs
-type InputSchemaConfig struct {
-	Type       string                 `yaml:"type"`
-	Required   []string               `yaml:"required,omitempty"`
-	Properties map[string]PropertyDef `yaml:"properties"`
+// PatternConfig describes an expected detection pattern
+type PatternConfig struct {
+	// Entity is the node type being analyzed (e.g., "Application", "Person")
+	Entity string `yaml:"entity"`
+
+	// SharedElements are the PII or attributes that may be shared
+	SharedElements []string `yaml:"shared_elements,omitempty"`
+
+	// Anomaly describes what makes this pattern suspicious
+	Anomaly string `yaml:"anomaly"`
 }
 
-// PropertyDef defines a single property in the input schema
-type PropertyDef struct {
-	Type        string                 `yaml:"type"`
-	Description string                 `yaml:"description"`
-	Default     interface{}            `yaml:"default,omitempty"`
-	Properties  map[string]PropertyDef `yaml:"properties,omitempty"`
+// ReferenceSchemaConfig provides hints about common graph elements
+type ReferenceSchemaConfig struct {
+	// Labels are common node labels to look for
+	Labels []string `yaml:"labels,omitempty"`
+
+	// Relationships are common relationship types to look for
+	Relationships []string `yaml:"relationships,omitempty"`
 }
 
-// ExecutionConfig defines how the query should be executed
-type ExecutionConfig struct {
-	// Mode is either "read" or "write"
-	Mode string `yaml:"mode"`
+// ParameterConfig defines a typed input parameter
+type ParameterConfig struct {
+	// Name is the parameter identifier
+	Name string `yaml:"name"`
 
-	// Timeout in milliseconds
-	Timeout int `yaml:"timeout"`
-}
+	// Type is the JSON Schema type (string, integer, number, boolean, array, object)
+	Type string `yaml:"type"`
 
-// MetadataConfig contains tool categorization and behavior flags
-type MetadataConfig struct {
-	// ReadOnly indicates if this tool only reads data
-	ReadOnly bool `yaml:"readonly"`
+	// Description explains the parameter's purpose
+	Description string `yaml:"description,omitempty"`
 
-	// Idempotent indicates if repeated calls produce the same result
-	Idempotent bool `yaml:"idempotent"`
+	// Default value (type depends on Type field)
+	Default interface{} `yaml:"default,omitempty"`
 
-	// Destructive indicates if this tool modifies data
-	Destructive bool `yaml:"destructive"`
-
-	// Category is derived from the folder structure (e.g., "fraud", "data")
-	Category string `yaml:"category"`
+	// Required indicates if this parameter must be provided
+	Required bool `yaml:"required,omitempty"`
 }

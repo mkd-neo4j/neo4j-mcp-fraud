@@ -1,128 +1,45 @@
 name: generate-scene-action
-title: Generate Neo4j Bloom Scene Action
 description: |
-  # NEO4J BLOOM SCENE ACTION GENERATOR
-
   Guides users through creating Scene Actions for Neo4j Bloom - parameterized Cypher queries
   that use currently selected graph elements as input parameters.
 
-  ## WHAT ARE SCENE ACTIONS?
-
-  Scene Actions are context-sensitive Cypher queries in Bloom that:
-  - Execute against **currently selected nodes or relationships** in the graph visualization
-  - Use selected elements as parameters (`$nodes` or `$relationships`)
-  - Can perform READ or WRITE operations (with appropriate permissions)
+intent: |
+  Help users create context-sensitive Cypher queries for Bloom that:
+  - Execute against currently selected nodes or relationships in the graph visualization
+  - Use selected elements as parameters ($nodes or $relationships)
   - Appear in the right-click context menu when elements are selected
   - Can be limited to specific node labels or relationship types
 
-  **Key Difference from Search Phrases:**
-  - **Scene Actions**: Use graph elements you've ALREADY selected as input
-  - **Search Phrases**: Start fresh queries from user-typed parameters
+  Key Difference from Search Phrases:
+  - Scene Actions: Use graph elements you've ALREADY selected as input
+  - Search Phrases: Start fresh queries from user-typed parameters
 
-  ---
+expected_patterns:
+  - entity: Node Selection
+    shared_elements: [Account, Customer, Transaction]
+    anomaly: Expand related nodes from selected entities using $nodes parameter
+  - entity: Relationship Selection
+    shared_elements: [TRANSACTION, OWNS, HAS_EMAIL]
+    anomaly: Analyze or expand from selected relationships using $relationships parameter
+  - entity: Fraud Detection
+    shared_elements: [Customer, SSN, Phone, Email, Address]
+    anomaly: Find other customers sharing identity attributes with selected customer(s)
 
-  ## WORKFLOW FOR CREATING SCENE ACTIONS
-
-  ### Step 1: Understand User Requirements
-  Ask the user to describe:
-  - **Goal**: What should this scene action do?
-  - **Input**: What will be selected? (nodes, relationships, specific labels)
-  - **Output**: What should be returned? (expanded graph, property values, aggregations)
-  - **Operation**: Is this READ-only or does it WRITE data?
-
-  ### Step 2: Get Database Schema
-  **CRITICAL**: Always call `get-schema` first to understand:
-  - Available node labels
-  - Relationship types and directions
-  - Property names and data types
-  - Index availability for performance
-
-  ### Step 3: Generate Test Query
-  Write a Cypher query using the appropriate parameter:
-  - `$nodes` for node-based scene actions
-  - `$relationships` for relationship-based scene actions
-
-  **Execute the query** using `read-cypher` or `write-cypher` to validate it works.
-
-  ### Step 4: User Validates Query
-  **IMPORTANT**: User must test the query in their Neo4j database and confirm it works correctly
-  before proceeding to Bloom formatting.
-
-  ### Step 5: Format as Scene Action
-  Once validated, provide the Scene Action configuration in Bloom-compatible format.
-
-  ---
-
-  ## CYPHER PATTERN REQUIREMENTS
-
-  ### Node-Based Scene Actions
-
-  Use `elementId()` function (Neo4j 5+) or `id()` (Neo4j 4.x) to filter by selected nodes:
-
-  ```cypher
-  // Neo4j 5+ (recommended)
+reference_cypher: |
+  // Node-Based Scene Action (Neo4j 5+)
   MATCH (n:NodeLabel)
   WHERE elementId(n) IN $nodes
   // ... rest of query
   RETURN ...
 
-  // Neo4j 4.x
-  MATCH (n:NodeLabel)
-  WHERE id(n) IN $nodes
-  // ... rest of query
-  RETURN ...
-  ```
-
-  **Parameter**: `$nodes` - Array of element IDs for selected nodes
-
-  ### Relationship-Based Scene Actions
-
-  ```cypher
-  MATCH ()-[r:RELATIONSHIP_TYPE]-()
-  WHERE elementId(r) IN $relationships
-  // ... rest of query
-  RETURN ...
-  ```
-
-  **Parameter**: `$relationships` - Array of element IDs for selected relationships
-
-  ### Return Value Best Practices
-
-  **Recommended returns:**
-  - `RETURN path` - Returns graph paths for visualization expansion
-  - `RETURN n, related` - Returns nodes for visualization expansion
-  - `RETURN collect(n) AS nodes` - Returns node collections
-
-  **Acceptable returns:**
-  - `RETURN n.property` - Returns property values (non-visual)
-  - `RETURN count(*) AS total` - Returns aggregations (non-visual)
-
-  **Avoid:**
-  - Returning only relationships without nodes (Bloom cannot visualize)
-  - Returning complex nested structures (use simple properties)
-
-  ---
-
-  ## COMMON SCENE ACTION PATTERNS
-
-  ### Pattern 1: Expand Related Nodes
-
-  **Use Case**: "Show all related entities of a specific type"
-
-  ```cypher
-  // Example: Show all customers who transacted with selected accounts
+  // Expand Related Nodes
   MATCH (a:Account)
   WHERE elementId(a) IN $nodes
   MATCH (a)<-[:OWNS]-(c:Customer)
   MATCH (c)-[:HAS_EMAIL]->(e:Email)
   RETURN a, c, e
-  ```
 
-  ### Pattern 2: Filter by Property Threshold
-
-  **Use Case**: "Find high-value transactions from selected accounts"
-
-  ```cypher
+  // Find High-Value Transactions
   MATCH (a:Account)
   WHERE elementId(a) IN $nodes
   MATCH (a)-[t:TRANSACTION]->(dest:Account)
@@ -130,289 +47,40 @@ description: |
   RETURN a, t, dest
   ORDER BY t.amount DESC
   LIMIT 50
-  ```
 
-  ### Pattern 3: Aggregate Information
+  // Fraud Detection - Shared PII
+  MATCH (suspect:Customer)
+  WHERE elementId(suspect) IN $nodes
+  MATCH (suspect)-[:HAS_EMAIL|HAS_PHONE|HAS_SSN]->(pii)
+  MATCH (other:Customer)-[:HAS_EMAIL|HAS_PHONE|HAS_SSN]->(pii)
+  WHERE suspect <> other
+  RETURN suspect, pii, other
+  LIMIT 50
 
-  **Use Case**: "Calculate total transaction volume for selected customers"
-
-  ```cypher
-  MATCH (c:Customer)
-  WHERE elementId(c) IN $nodes
-  MATCH (c)-[:OWNS]->(a:Account)
-  MATCH (a)-[t:TRANSACTION]->()
-  RETURN
-    c.customerId AS customerId,
-    c.firstName + ' ' + c.lastName AS name,
-    count(t) AS transactionCount,
-    sum(t.amount) AS totalVolume
-  ORDER BY totalVolume DESC
-  ```
-
-  ### Pattern 4: Multi-Hop Path Finding
-
-  **Use Case**: "Find connection paths between selected nodes"
-
-  ```cypher
+  // Multi-Hop Path Finding
   MATCH (start:Customer)
   WHERE elementId(start) IN $nodes
   MATCH (end:Customer)
   WHERE elementId(end) IN $nodes AND start <> end
   MATCH path = shortestPath((start)-[*..5]-(end))
   RETURN path
-  ```
 
-  ### Pattern 5: Fraud Detection - Shared PII
-
-  **Use Case**: "Find other customers sharing identity attributes with selected customer"
-
-  ```cypher
-  MATCH (suspect:Customer)
-  WHERE elementId(suspect) IN $nodes
-  MATCH (suspect)-[:HAS_EMAIL|HAS_PHONE|HAS_SSN]->(pii)
-  MATCH (other:Customer)-[:HAS_EMAIL|HAS_PHONE|HAS_SSN]->(pii)
-  WHERE suspect <> other
-  RETURN suspect, pii, other
-  LIMIT 50
-  ```
-
-  ### Pattern 6: Write Operation - Flag for Review
-
-  **Use Case**: "Mark selected accounts as flagged for investigation"
-
-  ```cypher
+  // Write Operation - Flag for Review
   MATCH (a:Account)
   WHERE elementId(a) IN $nodes
   SET a.flagged = true,
       a.flaggedDate = datetime(),
       a.flaggedReason = 'Manual review requested'
   RETURN a
-  ```
 
-  **Note**: WRITE operations require:
-  - User has WRITE permissions in Bloom settings
-  - Clear communication to user about data modification
-  - Consideration of transaction safety and rollback
+reference_schema:
+  labels: [Customer, Account, Transaction, Email, Phone, SSN, Address]
+  relationships: [OWNS, TRANSACTION, HAS_EMAIL, HAS_PHONE, HAS_SSN, HAS_ADDRESS]
 
-  ---
-
-  ## BLOOM SCENE ACTION CONFIGURATION
-
-  Once the Cypher query is validated, provide this information:
-
-  ### Configuration Elements
-
-  1. **Name**: Descriptive name (shown in context menu)
-     - Use clear, action-oriented language
-     - Examples: "Expand related customers", "Find shared identities", "Calculate transaction volume"
-
-  2. **Cypher Query**: The validated query
-     - Must use `$nodes` or `$relationships` parameter
-     - Should include LIMIT clauses for performance
-     - Consider index usage for large datasets
-
-  3. **Transaction Type**:
-     - **READ**: For queries that only read data (most common)
-     - **WRITE**: For queries that modify data (requires explicit enabling)
-
-  4. **Category Filter** (optional):
-     - Limit to specific node labels: `["Customer", "Account"]`
-     - Limit to specific relationship types: `["TRANSACTION", "OWNS"]`
-     - Leave empty to work with any selection
-
-  5. **Description**: Brief explanation of what this action does
-     - Helps users understand when to use it
-     - Shown in Bloom UI on hover
-
-  ### Example Configuration
-
-  ```
-  Scene Action Configuration:
-
-  Name: "Find Shared Identity Attributes"
-
-  Description: "Identifies other customers sharing email, phone, or SSN with selected customer(s).
-  Used for synthetic identity fraud detection."
-
-  Cypher Query:
-  MATCH (suspect:Customer)
-  WHERE elementId(suspect) IN $nodes
-  MATCH (suspect)-[:HAS_EMAIL|HAS_PHONE|HAS_SSN]->(pii)
-  MATCH (other:Customer)-[:HAS_EMAIL|HAS_PHONE|HAS_SSN]->(pii)
-  WHERE suspect <> other
-  RETURN suspect, pii, other
-  LIMIT 50
-
-  Transaction Type: READ
-
-  Category Filter: ["Customer"]
-
-  Available In: Context menu when Customer nodes are selected
-  ```
-
-  ---
-
-  ## IMPORTING INTO BLOOM
-
-  ### Method 1: Bloom UI (Recommended)
-
-  1. Open Neo4j Bloom
-  2. Open the Perspective drawer (left sidebar)
-  3. Navigate to "Saved Cypher" section
-  4. Click "Add Scene Action"
-  5. Enter the configuration:
-     - Name
-     - Description
-     - Cypher query
-     - Select READ or WRITE
-     - Optionally add category filters
-  6. Save the scene action
-
-  ### Method 2: Perspective JSON Export/Import
-
-  For bulk management or sharing:
-
-  1. Export current perspective: Perspective settings → Export
-  2. Edit the JSON file to add scene action under `"sceneActions"` array
-  3. Import updated perspective: Perspective settings → Import
-
-  **JSON Structure**:
-  ```json
-  {
-    "perspective": {
-      "sceneActions": [
-        {
-          "name": "Find Shared Identity Attributes",
-          "description": "Identifies other customers sharing email, phone, or SSN",
-          "cypher": "MATCH (suspect:Customer)\nWHERE elementId(suspect) IN $nodes\nMATCH (suspect)-[:HAS_EMAIL|HAS_PHONE|HAS_SSN]->(pii)\nMATCH (other:Customer)-[:HAS_EMAIL|HAS_PHONE|HAS_SSN]->(pii)\nWHERE suspect <> other\nRETURN suspect, pii, other\nLIMIT 50",
-          "parameters": {
-            "nodes": {
-              "type": "node"
-            }
-          },
-          "transactionType": "READ",
-          "categories": ["Customer"]
-        }
-      ]
-    }
-  }
-  ```
-
-  ---
-
-  ## PERFORMANCE CONSIDERATIONS
-
-  ### Best Practices for Scene Actions
-
-  1. **Use LIMIT clauses**: Prevent overwhelming results
-     ```cypher
-     LIMIT 50  // or 100, depending on use case
-     ```
-
-  2. **Leverage indexes**: Ensure indexed properties for filters
-     ```cypher
-     WHERE t.amount > 10000  // If 'amount' is indexed
-     ```
-
-  3. **Avoid expensive operations**:
-     - Large cartesian products
-     - Unbounded variable-length paths `[*]`
-     - Complex aggregations without filters
-
-  4. **Consider cardinality**:
-     - If selecting multiple nodes, query executes per selection set
-     - Test with realistic selection sizes (1 node, 5 nodes, 20 nodes)
-
-  5. **Add reasonable limits**:
-     ```cypher
-     MATCH path = (n)-[*..3]-(related)  // Limit path depth
-     RETURN path
-     LIMIT 100  // Limit result count
-     ```
-
-  ---
-
-  ## TROUBLESHOOTING
-
-  ### Issue: Scene Action Doesn't Appear in Context Menu
-
-  **Solutions:**
-  - Verify the query uses `$nodes` or `$relationships` parameter
-  - Check category filter matches selected node labels
-  - Ensure perspective is saved and refreshed
-  - Confirm user has appropriate permissions
-
-  ### Issue: Query Times Out or Is Too Slow
-
-  **Solutions:**
-  - Add LIMIT clause to cap results
-  - Check for missing indexes on filtered properties
-  - Simplify complex path queries
-  - Break into smaller operations
-
-  ### Issue: WRITE Scene Action Not Available
-
-  **Solutions:**
-  - Enable WRITE transactions in Bloom Settings
-  - Verify user has write permissions on database
-  - Check Bloom version supports write operations
-
-  ### Issue: Results Not Showing in Graph
-
-  **Solutions:**
-  - Ensure query returns nodes or paths (not just properties)
-  - Check RETURN clause includes graph elements
-  - Verify returned nodes exist in current perspective
-
-  ---
-
-  ## ADDITIONAL RESOURCES
-
-  - **Neo4j Bloom Scene Actions Documentation**: https://neo4j.com/docs/bloom-user-guide/current/bloom-tutorial/scene-actions/
-  - **Cypher Query Language Reference**: https://neo4j.com/docs/cypher-manual/current/
-  - **Neo4j Bloom User Guide**: https://neo4j.com/docs/bloom-user-guide/current/
-
-  ---
-
-  ## CONVERSATION FLOW EXAMPLE
-
-  **User**: "I want to create a scene action that shows all transactions over $10,000 for a selected account."
-
-  **Assistant**:
-  1. Calls `get-schema` to understand Account and Transaction structure
-  2. Generates test query:
-     ```cypher
-     MATCH (a:Account)
-     WHERE elementId(a) IN $nodes
-     MATCH (a)-[t:TRANSACTION]->(dest:Account)
-     WHERE t.amount > 10000
-     RETURN a, t, dest
-     ORDER BY t.amount DESC
-     LIMIT 50
-     ```
-  3. Asks user to test query with sample data
-  4. Once validated, provides Scene Action configuration:
-     - Name: "Show High-Value Transactions"
-     - Description: "Displays all transactions over $10,000 from selected account(s)"
-     - Transaction Type: READ
-     - Category Filter: ["Account"]
-  5. Provides instructions for importing into Bloom
-
-  ---
-
-  **IMPORTANT REMINDERS:**
-
-  - ✅ Always call `get-schema` first to understand database structure
-  - ✅ Generate and test Cypher query BEFORE formatting as scene action
-  - ✅ User must validate query works with their data
-  - ✅ Use `elementId()` for Neo4j 5+, `id()` for Neo4j 4.x
-  - ✅ Include LIMIT clauses for performance
-  - ✅ Return graph elements (nodes/paths) not just properties
-  - ✅ Document READ vs WRITE transaction type clearly
-  - ✅ Provide clear import instructions for Bloom UI
-
-metadata:
-  readonly: true
-  idempotent: true
-  destructive: false
-  category: bloom
+parameters:
+  - name: nodes
+    type: array
+    description: Array of element IDs for selected nodes (provided by Bloom)
+  - name: relationships
+    type: array
+    description: Array of element IDs for selected relationships (provided by Bloom)

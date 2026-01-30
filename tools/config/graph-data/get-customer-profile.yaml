@@ -1,265 +1,66 @@
 name: get-customer-profile
-title: Get Customer Profile
 description: |
   Retrieves comprehensive customer profile information from the graph database.
 
-  This tool gathers complete customer identity, contact information, and relationship data for various business needs:
-  - **Customer service**: Full account and contact details for customer inquiries
-  - **KYC/CDD**: Identity verification, document validation, and customer onboarding
-  - **Compliance audits**: Review customer information completeness and accuracy
-  - **Relationship analysis**: Understand account ownership, beneficial owners, and authorized users
-  - **Fraud investigation**: Comprehensive profile gathering for suspicious activity investigation and SAR preparation
+intent: |
+  Gather complete customer identity, contact information, and relationship data for:
+  - Customer service: Full account and contact details for customer inquiries
+  - KYC/CDD: Identity verification, document validation, and customer onboarding
+  - Compliance audits: Review customer information completeness and accuracy
+  - Fraud investigation: Comprehensive profile gathering for suspicious activity investigation
 
-  The tool is designed to retrieve **all available customer data** in the database, making it suitable for
-  both routine operations and in-depth investigations when needed.
+expected_patterns:
+  - entity: Customer
+    shared_elements: [Email, Phone, Address, SSN, DriverLicense, Passport, Account]
+    anomaly: Missing or incomplete identity data that could indicate synthetic identity or data quality issues
 
-  ---
-
-  **YOUR TASK:**
-  1. Call `get-schema` to discover the database structure
-  2. Identify the Customer node and its attribute relationships (emails, phones, SSN, addresses, etc.)
-  3. Write a Cypher query that retrieves the customer's complete profile
-  4. Use OPTIONAL MATCH for all attributes to handle missing data gracefully
-  5. Include temporal context (validFrom/validTo, current/previous) for time-sensitive data like addresses
-  6. Capture relationship to institution if available in the schema (customer type, account role)
-
-  **QUERY REQUIREMENTS:**
-
-  Your query should retrieve comprehensive customer information across these categories:
-
-  - **Base customer properties**: Name, date of birth, nationality, customer type, account open date
-    *Used for: Identity verification, account setup, fraud investigation (SAR Part I, Items 1-3)*
-
-  - **Contact information**: Emails (with verification status), phones (with type), addresses with temporal classification
-    *Used for: Communication, address verification, compliance checks (SAR Part I, Items 2, 6-7)*
-    *Note: Classify addresses as current/previous/business/residential with validFrom/validTo dates*
-
-  - **Identity documents**: SSN, driver license, passport with issuer/state details and expiry dates
-    *Used for: KYC verification, fraud detection, compliance reporting (SAR Part I, Items 4-5)*
-
-  - **Account information**: All accounts owned by customer with type, status, open/close dates, balance
-    *Used for: Account servicing, transaction context, relationship analysis (SAR Part II context)*
-
-  - **Employment details**: Occupation, employer, business type, industry
-    *Used for: KYC profiling, expected activity patterns (SAR Part I, Item 8)*
-
-  - **Relationship to institution**: Customer type (individual/business/trust), relationship role
-    *Used for: Compliance classification, reporting requirements (SAR Part I, Item 9)*
-    *Look for properties like: relationshipType, accountRole, customerType*
-
-  - **Related parties**: Beneficial owners, authorized users, linked entities with relationship details
-    *Used for: Understanding account control, compliance screening, fraud investigation (SAR Section 2.5)*
-
-  - **Entity-specific details** (for business customers):
-    *Legal name vs. trading names, country of incorporation, registered vs. business addresses*
-    *Companies House reference (UK) or EIN (US), beneficial ownership structure*
-    *Used for: Corporate KYC, UBO identification, regulatory reporting*
-
-  - **Any other relevant profile information** available in your schema that aids customer understanding
-
-  **HANDLING MISSING DATA:**
-
-  Best practice for customer data retrieval:
-  - Use OPTIONAL MATCH for all identity attributes (don't fail if data is missing)
-  - Return null/empty for missing fields (don't omit them from results)
-  - For compliance reporting, missing information must be explicitly documented as "UNKNOWN"
-  - Include all available data points even if incomplete
-
-  **EXAMPLE QUERY PATTERN:**
-  ```cypher
+reference_cypher: |
   MATCH (c:Customer {customerId: $customerId})
 
-  // Contact information - WITH TEMPORAL CONTEXT
+  // Contact information
   OPTIONAL MATCH (c)-[:HAS_EMAIL]->(e:Email)
   OPTIONAL MATCH (c)-[:HAS_PHONE]->(p:Phone)
   OPTIONAL MATCH (c)-[:HAS_ADDRESS]->(a:Address)
 
-  // Identity documents - WITH ISSUER DETAILS
+  // Identity documents
   OPTIONAL MATCH (c)-[:HAS_SSN]->(s:SSN)
   OPTIONAL MATCH (c)-[:HAS_DRIVER_LICENSE]->(dl:DriverLicense)
   OPTIONAL MATCH (c)-[:HAS_PASSPORT]->(pp:Passport)
 
-  // Accounts - FOR TRANSACTION CONTEXT
+  // Accounts
   OPTIONAL MATCH (c)-[:OWNS]->(acc:Account)
-
-  // Employment - OCCUPATION DETAILS
-  OPTIONAL MATCH (c)-[:HAS_EMPLOYMENT]->(emp:Employment)
-
-  // Relationships - OTHER PARTIES INVOLVED
-  OPTIONAL MATCH (c)-[:BENEFICIAL_OWNER_OF]->(entity:Entity)
-  OPTIONAL MATCH (c)-[:AUTHORIZED_USER_OF]->(authAcc:Account)
-
-  // Entity details (if Customer is a business)
-  OPTIONAL MATCH (c)-[:HAS_TRADING_NAME]->(tradingName:TradingName)
-  OPTIONAL MATCH (c)-[:INCORPORATED_IN]->(country:Country)
 
   RETURN {
     base_details: {
       customerId: c.customerId,
       firstName: c.firstName,
       lastName: c.lastName,
-      legalName: c.legalName,  // For entities
       dateOfBirth: c.dateOfBirth,
       nationality: c.nationality,
-      customerType: c.customerType,  // individual | business | trust
-      relationshipToInstitution: c.relationshipType,  // SAR Part I, Item 9
+      customerType: c.customerType,
       createdAt: c.createdAt
     },
     contact_information: {
-      emails: collect(DISTINCT {
-        address: e.address,
-        verified: e.verified,
-        createdAt: e.createdAt,
-        primary: e.primary
-      }),
-      phones: collect(DISTINCT {
-        number: p.number,
-        type: p.type,  // mobile | home | work
-        primary: p.primary,
-        verified: p.verified
-      }),
-      addresses: collect(DISTINCT {
-        street: a.street,
-        city: a.city,
-        state: a.state,
-        zip: a.zip,
-        country: a.country,
-        type: a.type,  // current | previous | business | residential | registered
-        validFrom: a.validFrom,
-        validTo: a.validTo,
-        isCurrent: a.validTo IS NULL OR a.validTo > datetime()
-      })
+      emails: collect(DISTINCT {address: e.address, verified: e.verified, primary: e.primary}),
+      phones: collect(DISTINCT {number: p.number, type: p.type, primary: p.primary}),
+      addresses: collect(DISTINCT {street: a.street, city: a.city, state: a.state, zip: a.zip, country: a.country, type: a.type})
     },
     identity_documents: {
-      ssn: collect(DISTINCT {
-        number: s.number,
-        issuedDate: s.issuedDate,
-        issuer: s.issuer  // SSA or country
-      }),
-      driverLicense: collect(DISTINCT {
-        number: dl.number,
-        state: dl.state,
-        expiryDate: dl.expiryDate,
-        issueDate: dl.issueDate
-      }),
-      passport: collect(DISTINCT {
-        number: pp.number,
-        country: pp.country,
-        expiryDate: pp.expiryDate,
-        issueDate: pp.issueDate
-      })
+      ssn: collect(DISTINCT {number: s.number}),
+      driverLicense: collect(DISTINCT {number: dl.number, state: dl.state, expiryDate: dl.expiryDate}),
+      passport: collect(DISTINCT {number: pp.number, country: pp.country, expiryDate: pp.expiryDate})
     },
     account_information: {
-      accounts: collect(DISTINCT {
-        accountNumber: acc.accountNumber,
-        accountType: acc.accountType,
-        openedDate: acc.openedDate,
-        closedDate: acc.closedDate,
-        status: acc.status,
-        balance: acc.balance,
-        currency: acc.currency
-      })
-    },
-    employment_details: {
-      occupation: collect(DISTINCT emp.occupation)[0],
-      employer: collect(DISTINCT emp.employer)[0],
-      businessType: collect(DISTINCT emp.businessType)[0],
-      industry: collect(DISTINCT emp.industry)[0]
-    },
-    entity_details: {
-      tradingNames: collect(DISTINCT tradingName.name),
-      countryOfIncorporation: collect(DISTINCT country.name)[0],
-      companiesHouseRef: c.companiesHouseRef,  // UK
-      ein: c.ein,  // US
-      registeredAddress: c.registeredAddress  // If stored as property
-    },
-    relationships: {
-      beneficialOwners: collect(DISTINCT {
-        entityId: entity.entityId,
-        name: entity.name,
-        type: entity.type,
-        ownershipPercentage: entity.ownershipPercentage
-      }),
-      authorizedAccounts: collect(DISTINCT {
-        accountNumber: authAcc.accountNumber,
-        accountType: authAcc.accountType,
-        authorizedDate: authAcc.authorizedDate
-      })
+      accounts: collect(DISTINCT {accountNumber: acc.accountNumber, accountType: acc.accountType, status: acc.status, balance: acc.balance})
     }
   } as profile
-  ```
 
-  **QUERY PARAMETERS:**
-  - `$customerId` (required) - The customer ID to retrieve
+reference_schema:
+  labels: [Customer, Email, Phone, Address, SSN, DriverLicense, Passport, Account]
+  relationships: [HAS_EMAIL, HAS_PHONE, HAS_ADDRESS, HAS_SSN, HAS_DRIVER_LICENSE, HAS_PASSPORT, OWNS]
 
-  ---
-
-  **WHEN INVESTIGATION OR SAR FILING IS REQUIRED:**
-
-  For fraud investigations and **Suspicious Activity Reports (SARs)** to financial crime authorities
-  (FinCEN in US, NCA in UK), this tool provides the comprehensive identity data required by regulation.
-
-  **SAR Part I: Subject Information** requires complete identification of all suspicious parties:
-  - Personal identifiers (name, DOB, nationality, SSN/TIN/EIN)
-  - Contact details with temporal context (current/previous/business addresses)
-  - Government-issued ID with issuers (driver license, passport, state ID)
-  - Relationship to institution (customer, authorized user, beneficial owner)
-  - Employment/occupation details
-  - Account ownership and access
-  - Related parties and beneficial owners
-
-  **SAR Compliance Standards:**
-  - FinCEN Form 111/112 (US): Requires name, DOB, address, SSN/TIN, ID, phone, email, occupation, relationship
-  - UK NCA SAR Template: Requires same plus Companies House reference, beneficial ownership structure
-  - Both require temporal context for addresses (current vs. previous vs. last known)
-
-  **Critical for SAR Filing:**
-  - SAR filings are **legal documents** submitted to financial crime authorities
-  - Incomplete identification can result in rejected SARs or delayed investigations
-  - Law enforcement relies on this data to investigate money laundering, terrorist financing, and fraud
-  - **Regulatory requirement**: Missing critical fields must be explicitly stated as "UNKNOWN" in SAR narrative
-  - SAR filings are strictly confidential; unauthorized disclosure is a criminal offense
-
-  This tool's comprehensive approach ensures that when an investigation is needed, you have all
-  required data for regulatory compliance without having to run additional queries.
-
-  ---
-
-  **OUTPUT STRUCTURE:**
-  Returns a structured profile organized into logical categories:
-  - `base_details` - Core customer properties: ID, name, DOB, nationality, customer type, relationship
-  - `contact_information` - Emails, phones, addresses with temporal context and verification status
-  - `identity_documents` - SSN, driver license, passport with issuer details and expiry dates
-  - `account_information` - All accounts owned: type, status, dates, balance, currency
-  - `employment_details` - Occupation, employer, business type, industry
-  - `entity_details` - Business-specific information: legal/trading names, incorporation, registration refs
-  - `relationships` - Beneficial owners, authorized users, linked entities with relationship context
-
-  **USE CASES:**
-  - **Customer service**: Retrieve full account and contact details to assist with customer inquiries
-  - **KYC/CDD**: Verify customer identity, validate documents, and complete onboarding requirements
-  - **Compliance audit**: Review customer information completeness and accuracy for regulatory standards
-  - **Account management**: Understand account ownership, relationships, and authorized users
-  - **Fraud investigation**: Gather complete customer profile for suspicious activity investigation and SAR preparation
-  - **AML screening**: Extract customer demographics and relationships for anti-money laundering analysis
-  - **Relationship analysis**: Map beneficial ownership structures and entity relationships
-  - **Identity verification**: Cross-reference identity attributes to detect synthetic identities or account takeover
-
-  **IMPORTANT NOTES:**
-  - Use OPTIONAL MATCH for all attributes (handles missing data gracefully without query failure)
-  - Use collect(DISTINCT ...) to avoid duplicate values in multi-relationship scenarios
-  - Structure output as nested objects for easy consumption by different use cases
-  - Include only relevant properties for each attribute based on your schema
-  - If the schema includes additional identity attributes (IP addresses, device IDs, etc.), include them
-  - For business customers, prioritize entity_details section for corporate KYC
-  - Address classification with temporal context (current/previous/business) aids compliance and investigation
-
-execution:
-  mode: read
-  timeout: 30000
-
-metadata:
-  readonly: true
-  idempotent: true
-  destructive: false
-  category: graph-data
+parameters:
+  - name: customerId
+    type: string
+    required: true
+    description: The customer ID to retrieve the profile for

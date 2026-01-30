@@ -8,19 +8,10 @@ import (
 
 	"github.com/mark3labs/mcp-go/mcp"
 	"github.com/mkd-neo4j/neo4j-mcp-fraud/internal/tools"
-	"github.com/neo4j/neo4j-go-driver/v5/neo4j"
 )
 
-// DynamicToolInput represents the generic input format for all dynamic tools
-type DynamicToolInput struct {
-	// Query is the Cypher query string (required)
-	Query string `json:"query"`
-
-	// Params contains optional query parameters
-	Params map[string]interface{} `json:"params,omitempty"`
-}
-
 // NewDynamicHandler creates a handler function for a dynamic tool
+// All config-based tools return enriched descriptions as guidance for the LLM
 func NewDynamicHandler(config *ToolConfig, deps *tools.ToolDependencies) func(context.Context, mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 	return func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 		return handleDynamicTool(ctx, request, config, deps)
@@ -28,102 +19,76 @@ func NewDynamicHandler(config *ToolConfig, deps *tools.ToolDependencies) func(co
 }
 
 func handleDynamicTool(ctx context.Context, request mcp.CallToolRequest, config *ToolConfig, deps *tools.ToolDependencies) (*mcp.CallToolResult, error) {
-	// Validate dependencies
-	if deps.AnalyticsService == nil {
-		errMessage := "Analytics service is not initialized"
-		slog.Error(errMessage)
-		return mcp.NewToolResultError(errMessage), nil
+	// Emit analytics event if available
+	if deps.AnalyticsService != nil {
+		deps.AnalyticsService.EmitEvent(
+			deps.AnalyticsService.NewToolsEvent(config.Name),
+		)
 	}
 
-	// Emit analytics event
-	deps.AnalyticsService.EmitEvent(
-		deps.AnalyticsService.NewToolsEvent(config.Name),
-	)
+	slog.Info("guidance tool called", "tool", config.Name, "category", config.Category)
 
-	// Check if this is a documentation tool (no execution block)
-	if config.Execution == nil {
-		slog.Info("documentation tool called", "tool", config.Name, "category", config.Metadata.Category)
-
-		// For documentation tools, return the description as the content
-		// The description field contains the full documentation/guidance
-		return mcp.NewToolResultText(config.Description), nil
-	}
-
-	if deps.DBService == nil {
-		errMessage := "Database service is not initialized"
-		slog.Error(errMessage)
-		return mcp.NewToolResultError(errMessage), nil
-	}
-
-	// Parse arguments for query-based tools
-	var args DynamicToolInput
-	if err := request.BindArguments(&args); err != nil {
-		slog.Error("error binding arguments", "tool", config.Name, "error", err)
-		return mcp.NewToolResultError(err.Error()), nil
-	}
-
-	// Validate required fields
-	if args.Query == "" {
-		errMessage := "query parameter is required"
-		slog.Error(errMessage, "tool", config.Name)
-		return mcp.NewToolResultError(errMessage), nil
-	}
-
-	// Security validation: check if query matches tool's execution mode
-	if err := validateQueryMode(args.Query, config.Execution.Mode); err != nil {
-		slog.Error("query validation failed", "tool", config.Name, "error", err)
-		return mcp.NewToolResultError(err.Error()), nil
-	}
-
-	slog.Info("executing dynamic tool",
-		"tool", config.Name,
-		"category", config.Metadata.Category,
-		"mode", config.Execution.Mode,
-		"hasParams", len(args.Params) > 0)
-
-	// Execute query based on mode
-	var records []*neo4j.Record
-	var err error
-
-	if config.Execution.Mode == "read" {
-		records, err = deps.DBService.ExecuteReadQuery(ctx, args.Query, args.Params)
-	} else {
-		records, err = deps.DBService.ExecuteWriteQuery(ctx, args.Query, args.Params)
-	}
-
-	if err != nil {
-		slog.Error("error executing query", "tool", config.Name, "error", err)
-		return mcp.NewToolResultError(err.Error()), nil
-	}
-
-	// Format records to JSON
-	response, err := deps.DBService.Neo4jRecordsToJSON(records)
-	if err != nil {
-		slog.Error("error formatting query results", "tool", config.Name, "error", err)
-		return mcp.NewToolResultError(err.Error()), nil
-	}
-
-	return mcp.NewToolResultText(response), nil
+	// Build and return enriched description with all semantic fields
+	enrichedDescription := buildEnrichedDescription(config)
+	return mcp.NewToolResultText(enrichedDescription), nil
 }
 
-// validateQueryMode checks if the query matches the declared execution mode
-// This is a basic security check to prevent write queries in read-only tools
-func validateQueryMode(query string, mode string) error {
-	normalizedQuery := strings.ToUpper(strings.TrimSpace(query))
+// buildEnrichedDescription creates a comprehensive description from all semantic fields
+func buildEnrichedDescription(config *ToolConfig) string {
+	var sb strings.Builder
 
-	if mode == "read" {
-		// Check for write operations in read mode
-		writeKeywords := []string{
-			"CREATE ", "MERGE ", "DELETE ", "REMOVE ", "SET ",
-			"DROP ", "DETACH DELETE", "CALL {", // CALL with subqueries can be write
-		}
+	// Core description
+	sb.WriteString(config.Description)
 
-		for _, keyword := range writeKeywords {
-			if strings.Contains(normalizedQuery, keyword) {
-				return fmt.Errorf("write operation detected in read-only tool: %s", keyword)
+	// Intent - when to use this tool
+	if config.Intent != "" {
+		sb.WriteString("\n\n## Intent\n")
+		sb.WriteString(config.Intent)
+	}
+
+	// Expected patterns - what this tool helps detect
+	if len(config.ExpectedPatterns) > 0 {
+		sb.WriteString("\n\n## Expected Patterns\n")
+		for _, p := range config.ExpectedPatterns {
+			sb.WriteString(fmt.Sprintf("- **%s**: %s\n", p.Entity, p.Anomaly))
+			if len(p.SharedElements) > 0 {
+				sb.WriteString(fmt.Sprintf("  Shared elements: %v\n", p.SharedElements))
 			}
 		}
 	}
 
-	return nil
+	// Reference Cypher - canonical implementation as guidance
+	if config.ReferenceCypher != "" {
+		sb.WriteString("\n\n## Reference Cypher\n```cypher\n")
+		sb.WriteString(config.ReferenceCypher)
+		sb.WriteString("\n```\n")
+	}
+
+	// Reference Schema - common labels and relationships to look for
+	if config.ReferenceSchema != nil {
+		sb.WriteString("\n\n## Reference Schema\n")
+		if len(config.ReferenceSchema.Labels) > 0 {
+			sb.WriteString(fmt.Sprintf("- Labels: %v\n", config.ReferenceSchema.Labels))
+		}
+		if len(config.ReferenceSchema.Relationships) > 0 {
+			sb.WriteString(fmt.Sprintf("- Relationships: %v\n", config.ReferenceSchema.Relationships))
+		}
+	}
+
+	// Parameters - expected query parameters
+	if len(config.Parameters) > 0 {
+		sb.WriteString("\n\n## Parameters\n")
+		for _, p := range config.Parameters {
+			sb.WriteString(fmt.Sprintf("- `$%s` (%s)", p.Name, p.Type))
+			if p.Default != nil {
+				sb.WriteString(fmt.Sprintf(" [default: %v]", p.Default))
+			}
+			if p.Description != "" {
+				sb.WriteString(fmt.Sprintf(": %s", p.Description))
+			}
+			sb.WriteString("\n")
+		}
+	}
+
+	return sb.String()
 }

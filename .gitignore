@@ -45,3 +45,6 @@ dist/
 CLAUDE.md
 gemini.md
 *.pem
+
+# Changelogs
+.changes/
